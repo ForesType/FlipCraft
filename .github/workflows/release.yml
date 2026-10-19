@@ -1,0 +1,268 @@
+name: Release FlipCraft
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag version override (e.g. v0.15.0)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-windows:
+    name: Build Windows (x64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binaries
+        run: cargo build --release -p flipcraft -p flipcraft-cli
+
+      - name: Package Windows portable zip
+        shell: pwsh
+        run: |
+          $ver = if ("${{ inputs.version }}") { "${{ inputs.version }}" } else { "${{ github.ref_name }}" }
+          if (-not $ver) { $ver = "v0.15.0" }
+          $stage = "flipcraft-$ver-windows-x64"
+          New-Item -ItemType Directory -Path $stage -Force
+          Copy-Item "target/release/flipcraft.exe" -Destination "$stage/"
+          Copy-Item "target/release/flipcraft-cli.exe" -Destination "$stage/"
+          Copy-Item "LICENSE-MIT" -Destination "$stage/"
+          Copy-Item "LICENSE-APACHE" -Destination "$stage/"
+          Copy-Item "NOTICE" -Destination "$stage/"
+          Copy-Item "README.md" -Destination "$stage/"
+          New-Item -ItemType Directory -Path "dist" -Force
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/flipcraft-$ver-windows-x64.zip"
+
+      - name: Package Windows MSI (WiX v5)
+        shell: pwsh
+        run: |
+          $ver = if ("${{ inputs.version }}") { "${{ inputs.version }}" } else { "${{ github.ref_name }}" }
+          if (-not $ver) { $ver = "v0.15.0" }
+          $cleanVer = $ver.TrimStart('v')
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
+          $binDir = (Resolve-Path "target/release").Path
+          $iconPath = (Resolve-Path "assets/app-icon/flipcraft.ico").Path
+          wix build packaging/windows/photocraft.wxs -arch x64 `
+            -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext `
+            -d Version=$cleanVer -d DisplayVersion=$ver `
+            -d BinDir=$binDir -d IconPath=$iconPath `
+            -o "dist/flipcraft-$ver-windows-x64.msi"
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/*
+
+  build-linux:
+    name: Build Linux (x86_64)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binaries
+        run: cargo build --release -p flipcraft -p flipcraft-cli
+
+      - name: Package Linux tar.gz
+        run: |
+          VER="${{ inputs.version || github.ref_name }}"
+          [ -z "$VER" ] && VER="v0.15.0"
+          STAGE="flipcraft-$VER-linux-x86_64"
+          mkdir -p "$STAGE/bin" "$STAGE/share/applications" "$STAGE/share/icons/hicolor/scalable/apps"
+          cp target/release/flipcraft "$STAGE/bin/"
+          cp target/release/flipcraft-cli "$STAGE/bin/"
+          cp LICENSE-MIT LICENSE-APACHE NOTICE README.md "$STAGE/"
+          cp assets/app-icon/flipcraft.svg "$STAGE/share/icons/hicolor/scalable/apps/ai.flipcraft.flipcraft.svg"
+          mkdir -p dist
+          tar -czvf "dist/flipcraft-$VER-linux-x86_64.tar.gz" -C "$STAGE" .
+
+      - name: Package AppImage and DEB
+        run: |
+          VER="${{ inputs.version || github.ref_name }}"
+          [ -z "$VER" ] && VER="v0.15.0"
+          # Produce AppImage bundle structure
+          APP_DIR="AppDir"
+          mkdir -p "$APP_DIR/usr/bin" "$APP_DIR/usr/share/icons/hicolor/scalable/apps"
+          cp target/release/flipcraft "$APP_DIR/usr/bin/"
+          cp target/release/flipcraft-cli "$APP_DIR/usr/bin/"
+          cp assets/app-icon/flipcraft.svg "$APP_DIR/usr/share/icons/hicolor/scalable/apps/ai.flipcraft.flipcraft.svg"
+          cat << 'EOF' > "$APP_DIR/AppRun"
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          exec "$HERE/usr/bin/flipcraft" "$@"
+          EOF
+          chmod +x "$APP_DIR/AppRun"
+          cat << 'EOF' > "$APP_DIR/ai.flipcraft.flipcraft.desktop"
+          [Desktop Entry]
+          Name=FlipCraft
+          Comment=Artist-centric pure Rust image editor
+          Exec=flipcraft %F
+          Icon=ai.flipcraft.flipcraft
+          Terminal=false
+          Type=Application
+          Categories=Graphics;2DGraphics;RasterGraphics;
+          MimeType=image/png;image/jpeg;image/webp;
+          EOF
+          cp "$APP_DIR/ai.flipcraft.flipcraft.desktop" "$APP_DIR/flipcraft.desktop"
+          # Download appimagetool and generate AppImage
+          curl -sLO https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage --appimage-extract-and-run "$APP_DIR" "dist/flipcraft-$VER-linux-x86_64.AppImage" || true
+          
+          # Create standalone .deb package
+          DEB_STAGE="flipcraft-deb"
+          CLEAN_VER="${VER#v}"
+          mkdir -p "$DEB_STAGE/DEBIAN" "$DEB_STAGE/usr/bin" "$DEB_STAGE/usr/share/applications"
+          cp target/release/flipcraft "$DEB_STAGE/usr/bin/"
+          cp target/release/flipcraft-cli "$DEB_STAGE/usr/bin/"
+          cp "$APP_DIR/ai.flipcraft.flipcraft.desktop" "$DEB_STAGE/usr/share/applications/"
+          cat << EOF > "$DEB_STAGE/DEBIAN/control"
+          Package: flipcraft
+          Version: $CLEAN_VER
+          Section: graphics
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Paxon123 <99889435+Paxon123@users.noreply.github.com>
+          Description: FlipCraft artist-centric image editor
+           A high-performance, artist-centric digital painting & image editor written in pure Rust.
+          EOF
+          dpkg-deb --build "$DEB_STAGE" "dist/flipcraft-$VER-linux-amd64.deb"
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: dist/*
+
+  build-macos:
+    name: Build macOS (Universal)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build universal binaries
+        run: |
+          cargo build --release -p flipcraft -p flipcraft-cli --target aarch64-apple-darwin
+          cargo build --release -p flipcraft -p flipcraft-cli --target x86_64-apple-darwin
+          mkdir -p target/universal
+          lipo -create -output target/universal/flipcraft target/aarch64-apple-darwin/release/flipcraft target/x86_64-apple-darwin/release/flipcraft
+          lipo -create -output target/universal/flipcraft-cli target/aarch64-apple-darwin/release/flipcraft-cli target/x86_64-apple-darwin/release/flipcraft-cli
+
+      - name: Assemble FlipCraft.app bundle and DMG
+        run: |
+          VER="${{ inputs.version || github.ref_name }}"
+          [ -z "$VER" ] && VER="v0.15.0"
+          CLEAN_VER="${VER#v}"
+          APP="FlipCraft.app"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp target/universal/flipcraft "$APP/Contents/MacOS/FlipCraft"
+          cp target/universal/flipcraft-cli "$APP/Contents/MacOS/flipcraft-cli"
+          cp assets/app-icon/photocraft.icns "$APP/Contents/Resources/FlipCraft.icns" || true
+          
+          # Render Info.plist
+          sed -e "s/@VERSION@/$VER/g" -e "s/@SHORT_VERSION@/$CLEAN_VER/g" -e "s/@BUILD_SHA@/${{ github.sha }}/g" packaging/macos/Info.plist.in > "$APP/Contents/Info.plist"
+          
+          # Ad-hoc codesign
+          codesign --force --deep --sign - "$APP"
+          
+          mkdir -p dist
+          # Create universal zip
+          zip -r "dist/flipcraft-$VER-macos-universal.zip" "$APP"
+          
+          # Create universal DMG
+          hdiutil create -volname "FlipCraft" -srcfolder "$APP" -ov -format UDZO "dist/flipcraft-$VER-macos-universal.dmg"
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: dist/*
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Stage release files
+        run: |
+          mkdir -p release-files
+          find release-artifacts -type f -exec cp {} release-files/ \;
+          ls -la release-files/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version || github.ref_name }}
+          name: Release ${{ inputs.version || github.ref_name }}
+          body: |
+            ## FlipCraft Release ${{ inputs.version || github.ref_name }}
+            
+            Welcome to **FlipCraft**, an artist-centric open-source image editor built in 100% pure Rust.
+            
+            ### Highlights
+            - **Catmull-Rom & Bézier Brush Dynamics**: Continuous curvature and smooth spline interpolation.
+            - **Needle-Sharp Stroke Tapering**: Tail aggressiveness filter eliminates blunt ends on fast flick strokes.
+            - **Adaptive Distance Stepping**: Clean-room distance accumulator prevents dab starvation when stylus pressure drops.
+            - **Native 16k & 8k Windows Ink Driver**: Direct `WM_POINTER` integration with hardware eraser flip detection and full pressure resolution.
+            - **Zero Bloat**: Native `egui`/`eframe` on `wgpu` without Electron or webview shells.
+            
+            ### Verification
+            All binary packages are built natively on GitHub Actions runners without external proprietary signing dependencies.
+          files: release-files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

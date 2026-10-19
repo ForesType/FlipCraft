@@ -1,0 +1,84 @@
+name: Priority Feature Request (Sponsor Backlog)
+description: Submit a prioritized feature request or enhancement backed by project sponsorship.
+title: "[Priority]: "
+labels: ["priority: sponsor", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Priority Feature Request
+        Thank you for supporting **FlipCraft**! Donations directly fund AI compute, tablet driver testing hardware, and ongoing core development.
+        Sponsored requests receive top priority in development queues while maintaining FlipCraft's architectural vision and quality standards.
+
+  - type: input
+    id: feature_title
+    attributes:
+      label: Feature Summary
+      description: A clear and concise title describing the requested feature or capability.
+      placeholder: "e.g., Dual-tip brush texture blending mode overrides"
+    validations:
+      required: true
+
+  - type: textarea
+    id: workflow_impact
+    attributes:
+      label: Artist Workflow & Creative Impact
+      description: Describe how this feature improves the creative painting workflow and why it is valuable to digital artists.
+      placeholder: "Explain the artistic use case, bottlenecks in current tooling, and how this feature enhances fluidity or control..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: specification
+    attributes:
+      label: Proposed Specification & Acceptance Criteria
+      description: Detail how the feature should behave, UI requirements, shortcuts, or brush dynamics parameters.
+      placeholder: "1. Add toggle under Brush Settings panel...\n2. Maintain 60+ FPS rendering during high-speed strokes...\n3. Support undo/redo history correctly..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: donation_network
+    attributes:
+      label: Sponsorship Network
+      description: Select the cryptocurrency network used for the donation.
+      options:
+        - "USDT (TRC-20 / Tron) [TFYNjg8Uob2mz84Q1yAV2RpHkhjJXafGq5]"
+        - "USDT (BEP-20 / BNB Chain) [0x9428E0499C830A2d26A4A229Bc5b6e88184Fa960]"
+    validations:
+      required: true
+
+  - type: input
+    id: transaction_id
+    attributes:
+      label: Transaction Hash (TxID)
+      description: Enter the blockchain transaction hash to verify your sponsorship on the public ledger.
+      placeholder: "e.g., 0x9f8b... or 7e3a..."
+    validations:
+      required: true
+
+  - type: input
+    id: donation_amount
+    attributes:
+      label: Sponsorship Amount (USDT)
+      description: Approximate amount contributed.
+      placeholder: "e.g., 50 USDT"
+    validations:
+      required: false
+
+  - type: input
+    id: contact_handle
+    attributes:
+      label: Contributor Contact (GitHub / Discord / Email)
+      description: How we can reach you for questions or test builds.
+      placeholder: "@your_handle or email@example.com"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Sponsorship Acknowledgement
+      options:
+        - label: "I understand that donations fund AI compute and ongoing development. Sponsored requests receive top priority in development queues while maintaining FlipCraft's vision and quality bar."
+          required: true

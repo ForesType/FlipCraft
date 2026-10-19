@@ -1,0 +1,18 @@
+[package]
+name = "photocraft-e2e-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Comprehensive opaque-box end-to-end integration tests for PhotoCraft brush engine and Windows tablet driver"
+
+[lints]
+workspace = true
+
+[dependencies]
+photocraft-paint = { workspace = true }
+photocraft-tablet = { workspace = true }
+photocraft-geom = { workspace = true }
+photocraft-raster = { workspace = true }
+photocraft-color = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
