@@ -32,10 +32,10 @@ pub mod xi;
 
 #[cfg(target_os = "macos")]
 pub mod macos;
-#[cfg(target_os = "linux")]
-pub mod x11;
 #[cfg(target_os = "windows")]
 pub mod windows;
+#[cfg(target_os = "linux")]
+pub mod x11;
 
 /// One pen reading. Tilt is in degrees (-90..90, W3C Pointer Events convention: +x tilts to the
 /// right, +y towards the user), rotation in degrees 0..360 (clockwise).

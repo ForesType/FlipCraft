@@ -247,11 +247,7 @@ impl SpacingInfo {
 
     #[inline]
     pub fn anisotropic(spacing_x: f64, spacing_y: f64, rotation: f64) -> Self {
-        Self {
-            spacing_x: spacing_x.max(0.25),
-            spacing_y: spacing_y.max(0.25),
-            rotation,
-        }
+        Self { spacing_x: spacing_x.max(0.25), spacing_y: spacing_y.max(0.25), rotation }
     }
 
     #[inline]
@@ -298,12 +294,7 @@ impl Default for DistanceAccumulator {
 
 impl DistanceAccumulator {
     pub const fn new() -> Self {
-        Self {
-            accumulated_distance: 0.0,
-            last_spacing: 0.0,
-            accum_x: 0.0,
-            accum_y: 0.0,
-        }
+        Self { accumulated_distance: 0.0, last_spacing: 0.0, accum_x: 0.0, accum_y: 0.0 }
     }
 
     /// Reset distance accumulators after a dab has been placed.
@@ -516,13 +507,7 @@ impl PathWalker {
     }
 
     /// Walks the segment between `a` and `p` using adaptive distance stepping.
-    fn walk_distance(
-        &mut self,
-        a: &StrokePoint,
-        p: &StrokePoint,
-        spacing_fn: &impl Fn(&StrokePoint) -> SpacingInfo,
-        out: &mut impl FnMut(StepInput),
-    ) {
+    fn walk_distance(&mut self, a: &StrokePoint, p: &StrokePoint, spacing_fn: &impl Fn(&StrokePoint) -> SpacingInfo, out: &mut impl FnMut(StepInput)) {
         let (dx, dy) = (p.x - a.x, p.y - a.y);
         let seg_len = (dx * dx + dy * dy).sqrt();
         if seg_len <= 1e-9 {
@@ -590,12 +575,7 @@ impl PathWalker {
     }
 
     /// Push an input point using anisotropic spacing information.
-    pub fn push_spacing(
-        &mut self,
-        p: StrokePoint,
-        spacing_fn: &impl Fn(&StrokePoint) -> SpacingInfo,
-        out: &mut impl FnMut(StepInput),
-    ) {
+    pub fn push_spacing(&mut self, p: StrokePoint, spacing_fn: &impl Fn(&StrokePoint) -> SpacingInfo, out: &mut impl FnMut(StepInput)) {
         let Some(a) = self.last else {
             self.last = Some(p);
             self.prev_pt = None;
@@ -1269,12 +1249,7 @@ mod tests {
     #[test]
     fn test_tapering_stroke_generates_dabs_to_the_tip_without_starvation() {
         // Brush configured with pressure-driven size: 60px diameter at pressure 1.0 down to tiny at 0.01
-        let brush = BrushSettings {
-            size: 60.0,
-            spacing: 0.25,
-            pressure_size: true,
-            ..Default::default()
-        };
+        let brush = BrushSettings { size: 60.0, spacing: 0.25, pressure_size: true, ..Default::default() };
 
         // Construct a stroke that starts thick and then rapidly tapers across small segments to the tip
         let mut pts = Vec::new();
@@ -1302,11 +1277,7 @@ mod tests {
         // leaving the stroke terminated prematurely at x = 0.
         // In our adaptive implementation, dabs are emitted all the way along the taper to the tip!
         let last_dab = dabs.last().expect("last dab exists");
-        assert!(
-            last_dab.center.x >= 26.5,
-            "dabs must reach the end of the stroke tip, got last dab at x = {}",
-            last_dab.center.x
-        );
+        assert!(last_dab.center.x >= 26.5, "dabs must reach the end of the stroke tip, got last dab at x = {}", last_dab.center.x);
 
         // Check that trailing dabs have continuously shrinking radii down to needle tip
         assert!(last_dab.radius < 5.0, "tip dab must be thin, got radius {}", last_dab.radius);
@@ -1319,26 +1290,12 @@ mod tests {
     #[test]
     fn test_high_speed_flick_zero_dab_starvation() {
         // High speed flick: pen accelerates rapidly while pressure plummets
-        let brush = BrushSettings {
-            size: 40.0,
-            spacing: 0.25,
-            pressure_size: true,
-            ..Default::default()
-        };
+        let brush = BrushSettings { size: 40.0, spacing: 0.25, pressure_size: true, ..Default::default() };
 
         let mut pts = Vec::new();
         pts.push(StrokePoint::new(0.0, 0.0, 1.0));
         // High speed flick coordinates with increasing segment distances and dropping pressure
-        let flick_data = [
-            (10.0, 0.9),
-            (25.0, 0.75),
-            (50.0, 0.5),
-            (85.0, 0.3),
-            (130.0, 0.15),
-            (180.0, 0.08),
-            (225.0, 0.03),
-            (250.0, 0.01),
-        ];
+        let flick_data = [(10.0, 0.9), (25.0, 0.75), (50.0, 0.5), (85.0, 0.3), (130.0, 0.15), (180.0, 0.08), (225.0, 0.03), (250.0, 0.01)];
         for (x, p) in flick_data {
             pts.push(StrokePoint::new(x, 0.0, p));
         }
@@ -1367,12 +1324,7 @@ mod tests {
 
     #[test]
     fn test_spacing_scales_smoothly_and_monotonically_with_pressure() {
-        let brush = BrushSettings {
-            size: 50.0,
-            spacing: 0.25,
-            pressure_size: true,
-            ..Default::default()
-        };
+        let brush = BrushSettings { size: 50.0, spacing: 0.25, pressure_size: true, ..Default::default() };
         let builder = DabBuilder::new(&brush);
 
         let mut prev_spacing = 0.0;
@@ -1380,7 +1332,13 @@ mod tests {
             let pressure = step as f32 / 100.0;
             let pt = StrokePoint::new(0.0, 0.0, pressure);
             let spacing = builder.step_len(&pt);
-            assert!(spacing >= prev_spacing, "spacing must be monotonically non-decreasing: at pressure {} spacing {} < prev {}", pressure, spacing, prev_spacing);
+            assert!(
+                spacing >= prev_spacing,
+                "spacing must be monotonically non-decreasing: at pressure {} spacing {} < prev {}",
+                pressure,
+                spacing,
+                prev_spacing
+            );
             prev_spacing = spacing;
         }
 
@@ -1426,12 +1384,7 @@ mod tests {
 
     #[test]
     fn test_decreasing_pressure_monotonically_tapers_diameter() {
-        let brush = BrushSettings {
-            size: 60.0,
-            pressure_size: true,
-            spacing: 0.1,
-            ..Default::default()
-        };
+        let brush = BrushSettings { size: 60.0, pressure_size: true, spacing: 0.1, ..Default::default() };
 
         let pts = vec![
             StrokePoint { x: 0.0, y: 0.0, pressure: 1.0, time: 0.0, ..Default::default() },
@@ -1453,13 +1406,7 @@ mod tests {
         // Verify diameters monotonically decrease along the tapering stroke
         let mut prev_radius = dabs[0].radius;
         for (i, dab) in dabs.iter().enumerate().skip(1) {
-            assert!(
-                dab.radius <= prev_radius + 1e-4,
-                "dab {} radius {} must not exceed previous radius {}",
-                i,
-                dab.radius,
-                prev_radius
-            );
+            assert!(dab.radius <= prev_radius + 1e-4, "dab {} radius {} must not exceed previous radius {}", i, dab.radius, prev_radius);
             prev_radius = dab.radius;
         }
 
@@ -1489,12 +1436,7 @@ mod tests {
 
     #[test]
     fn test_short_fast_flick_velocity_tapering() {
-        let brush = BrushSettings {
-            size: 40.0,
-            pressure_size: true,
-            spacing: 0.1,
-            ..Default::default()
-        };
+        let brush = BrushSettings { size: 40.0, pressure_size: true, spacing: 0.1, ..Default::default() };
 
         // 4-point fast flick with natural lift-off tapering to zero pressure
         let pts = vec![

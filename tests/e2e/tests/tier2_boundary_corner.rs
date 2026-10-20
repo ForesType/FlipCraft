@@ -121,19 +121,8 @@ fn test_f2_zero_flatness_threshold_safety() {
 
 #[test]
 fn test_f2_nan_coordinate_rejection() {
-    let p = StrokePoint {
-        x: f64::NAN,
-        y: f64::INFINITY,
-        pressure: f32::NAN,
-        ..Default::default()
-    };
-    let s = Sample {
-        pressure: p.pressure,
-        tilt_x: f32::NAN,
-        tilt_y: f32::INFINITY,
-        rotation: f32::NAN,
-        eraser: false,
-    }.sanitized();
+    let p = StrokePoint { x: f64::NAN, y: f64::INFINITY, pressure: f32::NAN, ..Default::default() };
+    let s = Sample { pressure: p.pressure, tilt_x: f32::NAN, tilt_y: f32::INFINITY, rotation: f32::NAN, eraser: false }.sanitized();
 
     assert_eq!(s.pressure, 1.0, "NaN pressure must sanitize to default 1.0");
     assert_eq!(s.tilt_x, 0.0, "NaN tilt must sanitize to 0.0");
@@ -146,10 +135,8 @@ fn test_f2_nan_coordinate_rejection() {
 
 #[test]
 fn test_f3_instantaneous_pressure_drop_infinity() {
-    let mut points = vec![
-        StrokePoint { x: 0.0, y: 0.0, pressure: 1.0, ..Default::default() },
-        StrokePoint { x: 50.0, y: 0.0, pressure: 0.0, ..Default::default() },
-    ];
+    let mut points =
+        vec![StrokePoint { x: 0.0, y: 0.0, pressure: 1.0, ..Default::default() }, StrokePoint { x: 50.0, y: 0.0, pressure: 0.0, ..Default::default() }];
 
     apply_tail_aggressiveness(&mut points, 50.0);
     // Instantaneous pressure collapse (1.0 to 0.0)
@@ -159,10 +146,8 @@ fn test_f3_instantaneous_pressure_drop_infinity() {
 
 #[test]
 fn test_f3_zero_pressure_gradient_steady_state() {
-    let mut points = vec![
-        StrokePoint { x: 10.0, y: 20.0, pressure: 0.5, ..Default::default() },
-        StrokePoint { x: 30.0, y: 20.0, pressure: 0.5, ..Default::default() },
-    ];
+    let mut points =
+        vec![StrokePoint { x: 10.0, y: 20.0, pressure: 0.5, ..Default::default() }, StrokePoint { x: 30.0, y: 20.0, pressure: 0.5, ..Default::default() }];
     let original = points.clone();
     apply_tail_aggressiveness(&mut points, 10.0);
     assert_eq!(points, original, "Steady pressure (dP/dt = 0) must apply zero tail pull");
@@ -170,10 +155,8 @@ fn test_f3_zero_pressure_gradient_steady_state() {
 
 #[test]
 fn test_f3_extreme_tail_aggressiveness_factor() {
-    let mut points = vec![
-        StrokePoint { x: 0.0, y: 0.0, pressure: 0.9, ..Default::default() },
-        StrokePoint { x: 100.0, y: 0.0, pressure: 0.1, ..Default::default() },
-    ];
+    let mut points =
+        vec![StrokePoint { x: 0.0, y: 0.0, pressure: 0.9, ..Default::default() }, StrokePoint { x: 100.0, y: 0.0, pressure: 0.1, ..Default::default() }];
     // Extreme factor 10,000
     apply_tail_aggressiveness(&mut points, 10000.0);
     assert!(points[0].x.is_finite());
@@ -182,9 +165,7 @@ fn test_f3_extreme_tail_aggressiveness_factor() {
 
 #[test]
 fn test_f3_single_point_stroke_boundary() {
-    let mut points = vec![
-        StrokePoint { x: 10.0, y: 10.0, pressure: 0.5, ..Default::default() }
-    ];
+    let mut points = vec![StrokePoint { x: 10.0, y: 10.0, pressure: 0.5, ..Default::default() }];
     let original = points.clone();
     apply_tail_aggressiveness(&mut points, 10.0);
     assert_eq!(points, original, "Single point stroke must not panic");
@@ -192,10 +173,8 @@ fn test_f3_single_point_stroke_boundary() {
 
 #[test]
 fn test_f3_non_finite_pressure_delta_guard() {
-    let mut points = vec![
-        StrokePoint { x: 0.0, y: 0.0, pressure: f32::NAN, ..Default::default() },
-        StrokePoint { x: 10.0, y: 0.0, pressure: 0.5, ..Default::default() },
-    ];
+    let mut points =
+        vec![StrokePoint { x: 0.0, y: 0.0, pressure: f32::NAN, ..Default::default() }, StrokePoint { x: 10.0, y: 0.0, pressure: 0.5, ..Default::default() }];
     apply_tail_aggressiveness(&mut points, 10.0);
     assert_eq!(points[0].x, 0.0, "NaN pressure delta must not displace coordinates");
 }
@@ -308,11 +287,7 @@ fn test_f5_extreme_aspect_ratio_chisel_tip() {
 #[test]
 fn test_f6_wm_pointerup_without_pointerdown() {
     let mut oracle = WindowsInkOracle::new();
-    let up = RawPointerEvent {
-        message: ink::message::WM_POINTERUP,
-        pointer_id: 99,
-        ..Default::default()
-    };
+    let up = RawPointerEvent { message: ink::message::WM_POINTERUP, pointer_id: 99, ..Default::default() };
     let update = oracle.feed(&up);
     // Stray up event with unknown pointer ID emits lift-off or resets safely without panic
     match update {
@@ -331,17 +306,8 @@ fn test_f6_null_window_handle_guard() {
 #[test]
 fn test_f6_rapid_pointer_capture_lost() {
     let mut oracle = WindowsInkOracle::new();
-    let down = RawPointerEvent {
-        message: ink::message::WM_POINTERDOWN,
-        pointer_id: 1,
-        raw_pressure: 500,
-        ..Default::default()
-    };
-    let capture_lost = RawPointerEvent {
-        message: ink::message::WM_POINTERLEAVE,
-        pointer_id: 1,
-        ..Default::default()
-    };
+    let down = RawPointerEvent { message: ink::message::WM_POINTERDOWN, pointer_id: 1, raw_pressure: 500, ..Default::default() };
+    let capture_lost = RawPointerEvent { message: ink::message::WM_POINTERLEAVE, pointer_id: 1, ..Default::default() };
 
     let _ = oracle.feed(&down);
     let u_lost = oracle.feed(&capture_lost);
@@ -351,11 +317,7 @@ fn test_f6_rapid_pointer_capture_lost() {
 
 #[test]
 fn test_f6_out_of_bounds_screen_coordinates() {
-    let event = RawPointerEvent {
-        x: -500,
-        y: -1000,
-        ..Default::default()
-    };
+    let event = RawPointerEvent { x: -500, y: -1000, ..Default::default() };
     assert_eq!(event.x, -500);
     assert_eq!(event.y, -1000);
 }
@@ -370,12 +332,8 @@ fn test_f6_interleaved_mouse_and_pen_packets() {
         raw_pressure: 500,
         ..Default::default()
     };
-    let mouse_move = RawPointerEvent {
-        pointer_type: ink::pointer_type::PT_MOUSE,
-        message: ink::message::WM_POINTERUPDATE,
-        pointer_id: 2,
-        ..Default::default()
-    };
+    let mouse_move =
+        RawPointerEvent { pointer_type: ink::pointer_type::PT_MOUSE, message: ink::message::WM_POINTERUPDATE, pointer_id: 2, ..Default::default() };
 
     let _ = oracle.feed(&pen_down);
     let u_mouse = oracle.feed(&mouse_move);
@@ -449,14 +407,8 @@ fn test_f7_event_buffer_full_overflow_handling() {
     let mut oracle = WindowsInkOracle::new();
     // Simulate continuous events for 5 seconds
     for t in 0i32..5000 {
-        let e = RawPointerEvent {
-            message: ink::message::WM_POINTERUPDATE,
-            x: t,
-            y: t,
-            raw_pressure: (t % 1024) as u32,
-            timestamp: t as u32,
-            ..Default::default()
-        };
+        let e =
+            RawPointerEvent { message: ink::message::WM_POINTERUPDATE, x: t, y: t, raw_pressure: (t % 1024) as u32, timestamp: t as u32, ..Default::default() };
         let _ = oracle.feed(&e);
     }
     // Verifies no unbounded memory growth or panic after 5000 events
@@ -465,12 +417,7 @@ fn test_f7_event_buffer_full_overflow_handling() {
 #[test]
 fn test_f7_single_event_stream_boundary() {
     let mut oracle = WindowsInkOracle::new();
-    let e = RawPointerEvent {
-        message: ink::message::WM_POINTERDOWN,
-        pointer_id: 1,
-        raw_pressure: 500,
-        ..Default::default()
-    };
+    let e = RawPointerEvent { message: ink::message::WM_POINTERDOWN, pointer_id: 1, raw_pressure: 500, ..Default::default() };
     let (samples, dropped) = oracle.filter_stream(&[e]);
     assert_eq!(samples.len(), 1, "Single-event stream must emit the event");
     assert_eq!(dropped, 0);
@@ -535,13 +482,8 @@ fn test_f9_mid_stroke_physical_eraser_flip() {
     });
 
     // While still in contact, stylus is flipped upside down
-    let flip_in_contact = RawPointerEvent {
-        message: ink::message::WM_POINTERUPDATE,
-        pointer_id: 1,
-        pen_flags: ink::pen_flag::INVERTED,
-        raw_pressure: 500,
-        ..Default::default()
-    };
+    let flip_in_contact =
+        RawPointerEvent { message: ink::message::WM_POINTERUPDATE, pointer_id: 1, pen_flags: ink::pen_flag::INVERTED, raw_pressure: 500, ..Default::default() };
 
     let u_flip = oracle.feed(&flip_in_contact);
     match u_flip {
@@ -558,14 +500,8 @@ fn test_f9_rapid_eraser_chatter_suppression() {
     // Rapid fluttering between tip and eraser in consecutive messages
     for i in 0..10 {
         let flags = if i % 2 == 0 { ink::pen_flag::INVERTED } else { ink::pen_flag::NONE };
-        let e = RawPointerEvent {
-            message: ink::message::WM_POINTERUPDATE,
-            pointer_id: 1,
-            pen_flags: flags,
-            raw_pressure: 500,
-            timestamp: i,
-            ..Default::default()
-        };
+        let e =
+            RawPointerEvent { message: ink::message::WM_POINTERUPDATE, pointer_id: 1, pen_flags: flags, raw_pressure: 500, timestamp: i, ..Default::default() };
         let _ = oracle.feed(&e);
     }
     // Must process without crash or state corruption

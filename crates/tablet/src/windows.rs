@@ -10,9 +10,7 @@
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::UI::Input::Pointer::{GetPointerPenInfo, GetPointerType, POINTER_PEN_INFO};
 use windows_sys::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
-use windows_sys::Win32::UI::WindowsAndMessaging::{
-    PT_PEN, WM_NCDESTROY, WM_POINTERDOWN, WM_POINTERENTER, WM_POINTERLEAVE, WM_POINTERUPDATE, WM_POINTERUP,
-};
+use windows_sys::Win32::UI::WindowsAndMessaging::{PT_PEN, WM_NCDESTROY, WM_POINTERDOWN, WM_POINTERENTER, WM_POINTERLEAVE, WM_POINTERUP, WM_POINTERUPDATE};
 
 use crate::ink::{DeviceBounds, RawPointerEvent, State};
 use crate::{Error, Sample, Update, deliver};
@@ -27,14 +25,7 @@ struct WindowHookData {
 }
 
 /// Win32 window subclass callback procedure.
-unsafe extern "system" fn subclass_proc(
-    hwnd: HWND,
-    umsg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-    subclass_id: usize,
-    ref_data: usize,
-) -> LRESULT {
+unsafe extern "system" fn subclass_proc(hwnd: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, subclass_id: usize, ref_data: usize) -> LRESULT {
     if subclass_id != SUBCLASS_ID || ref_data == 0 {
         // SAFETY: Fall through to standard subclass chain if not our subclass ID or invalid ref_data.
         return unsafe { DefSubclassProc(hwnd, umsg, wparam, lparam) };
@@ -112,30 +103,17 @@ impl WindowsMonitor {
     ///
     /// Intercepts `WM_POINTER*` messages, processes them with high-fidelity 8k/16k scaling,
     /// tilt, rotation, and eraser flip detection, and reports samples through `callback`.
-    pub fn install(
-        raw_hwnd: isize,
-        callback: impl Fn(Option<Sample>) + Send + 'static,
-    ) -> Result<Self, Error> {
+    pub fn install(raw_hwnd: isize, callback: impl Fn(Option<Sample>) + Send + 'static) -> Result<Self, Error> {
         if raw_hwnd == 0 {
             return Err(Error::Platform("invalid HWND handle (null)".into()));
         }
 
         let hwnd = raw_hwnd as HWND;
-        let data = Box::into_raw(Box::new(WindowHookData {
-            state: State::new(),
-            callback: Box::new(callback),
-        }));
+        let data = Box::into_raw(Box::new(WindowHookData { state: State::new(), callback: Box::new(callback) }));
 
         // SAFETY: `hwnd` is a valid window handle provided by eframe/winit, `subclass_proc` is a
         // valid extern "system" function, and `data` is a valid heap pointer.
-        let ok = unsafe {
-            SetWindowSubclass(
-                hwnd,
-                Some(subclass_proc),
-                SUBCLASS_ID,
-                data as usize,
-            )
-        };
+        let ok = unsafe { SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, data as usize) };
 
         if ok == 0 {
             // SAFETY: Clean up heap allocation on failure to prevent memory leaks.
@@ -143,11 +121,7 @@ impl WindowsMonitor {
             return Err(Error::Platform("SetWindowSubclass failed on HWND".into()));
         }
 
-        Ok(Self {
-            hwnd,
-            subclass_id: SUBCLASS_ID,
-            data,
-        })
+        Ok(Self { hwnd, subclass_id: SUBCLASS_ID, data })
     }
 }
 

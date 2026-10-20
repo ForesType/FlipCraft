@@ -4,8 +4,6 @@
 //! reference oracles, and invariant checkers for the PhotoCraft brush engine and
 //! Windows tablet driver overhaul.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 pub use photocraft_geom::Point;
 pub use photocraft_paint::brush::BrushSettings;
 pub use photocraft_paint::dynamics::{DabBuilder, DabGenerator, PathWalker, StepInput};
@@ -13,6 +11,8 @@ pub use photocraft_paint::{Dab, StrokePoint};
 pub use photocraft_tablet::ink;
 pub use photocraft_tablet::ink::{DeviceBounds, RawPointerEvent, State as InkState};
 pub use photocraft_tablet::{Sample, Update};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 // ============================================================================
 // 1. Synthetic Stroke Generator & Builders
@@ -33,50 +33,20 @@ impl Default for StrokeTrajectoryBuilder {
 
 impl StrokeTrajectoryBuilder {
     pub fn new() -> Self {
-        Self {
-            points: Vec::new(),
-            current_time: 0.0,
-        }
+        Self { points: Vec::new(), current_time: 0.0 }
     }
 
     /// Appends a point with explicit coordinates and pressure.
     pub fn add_point(mut self, x: f64, y: f64, pressure: f32) -> Self {
-        self.points.push(StrokePoint {
-            x,
-            y,
-            pressure,
-            tilt_x: 0.0,
-            tilt_y: 0.0,
-            rotation: 0.0,
-            wheel: 0.0,
-            time: self.current_time,
-        });
+        self.points.push(StrokePoint { x, y, pressure, tilt_x: 0.0, tilt_y: 0.0, rotation: 0.0, wheel: 0.0, time: self.current_time });
         self.current_time += 16.666; // default 60Hz tick
         self
     }
 
     /// Appends a point with full telemetry (pressure, tilt, rotation, time).
     #[allow(clippy::too_many_arguments)]
-    pub fn add_full(
-        mut self,
-        x: f64,
-        y: f64,
-        pressure: f32,
-        tilt_x: f32,
-        tilt_y: f32,
-        rotation: f32,
-        time: f64,
-    ) -> Self {
-        self.points.push(StrokePoint {
-            x,
-            y,
-            pressure,
-            tilt_x,
-            tilt_y,
-            rotation,
-            wheel: 0.0,
-            time,
-        });
+    pub fn add_full(mut self, x: f64, y: f64, pressure: f32, tilt_x: f32, tilt_y: f32, rotation: f32, time: f64) -> Self {
+        self.points.push(StrokePoint { x, y, pressure, tilt_x, tilt_y, rotation, wheel: 0.0, time });
         self.current_time = time;
         self
     }
@@ -91,11 +61,7 @@ impl StrokeTrajectoryBuilder {
             // Nonlinear spacing: accelerates at the tail
             let dist = length * (t * t);
             // Pressure decays from 0.95 to 0.0
-            let pressure = if t < 0.3 {
-                0.95
-            } else {
-                (0.95 * (1.0 - (t - 0.3) / 0.7)).max(0.0) as f32
-            };
+            let pressure = if t < 0.3 { 0.95 } else { (0.95 * (1.0 - (t - 0.3) / 0.7)).max(0.0) as f32 };
             pts.push(StrokePoint {
                 x: start_x + dist,
                 y: start_y + dist * 0.25,
@@ -111,12 +77,7 @@ impl StrokeTrajectoryBuilder {
     }
 
     /// Generates rapid hatch shading: multiple rapid bidirectional strokes.
-    pub fn create_hatch_shading(
-        origin_x: f64,
-        origin_y: f64,
-        stroke_length: f64,
-        stroke_count: usize,
-    ) -> Vec<StrokePoint> {
+    pub fn create_hatch_shading(origin_x: f64, origin_y: f64, stroke_length: f64, stroke_count: usize) -> Vec<StrokePoint> {
         let mut pts = Vec::new();
         let mut t_ms = 0.0;
         for s in 0..stroke_count {
@@ -125,22 +86,9 @@ impl StrokeTrajectoryBuilder {
             let n = 15;
             for i in 0..=n {
                 let frac = i as f64 / n as f64;
-                let x = if forward {
-                    origin_x + frac * stroke_length
-                } else {
-                    origin_x + (1.0 - frac) * stroke_length
-                };
+                let x = if forward { origin_x + frac * stroke_length } else { origin_x + (1.0 - frac) * stroke_length };
                 let p = (0.3 + 0.5 * (1.0 - (2.0 * frac - 1.0).powi(2))) as f32;
-                pts.push(StrokePoint {
-                    x,
-                    y: origin_y + y_off,
-                    pressure: p,
-                    tilt_x: 0.0,
-                    tilt_y: 0.0,
-                    rotation: 0.0,
-                    wheel: 0.0,
-                    time: t_ms,
-                });
+                pts.push(StrokePoint { x, y: origin_y + y_off, pressure: p, tilt_x: 0.0, tilt_y: 0.0, rotation: 0.0, wheel: 0.0, time: t_ms });
                 t_ms += 2.0; // 500Hz
             }
         }
@@ -148,28 +96,14 @@ impl StrokeTrajectoryBuilder {
     }
 
     /// Generates a smooth curved arc (e.g. 90-degree bend).
-    pub fn create_curved_arc(
-        center_x: f64,
-        center_y: f64,
-        radius: f64,
-        steps: usize,
-    ) -> Vec<StrokePoint> {
+    pub fn create_curved_arc(center_x: f64, center_y: f64, radius: f64, steps: usize) -> Vec<StrokePoint> {
         let mut pts = Vec::new();
         for i in 0..=steps {
             let theta = (i as f64 / steps as f64) * std::f64::consts::FRAC_PI_2;
             let x = center_x + radius * theta.cos();
             let y = center_y + radius * theta.sin();
             let pressure = 0.5 + 0.3 * (theta.sin() as f32);
-            pts.push(StrokePoint {
-                x,
-                y,
-                pressure,
-                tilt_x: 0.0,
-                tilt_y: 0.0,
-                rotation: (theta.to_degrees() as f32),
-                wheel: 0.0,
-                time: (i as f64) * 8.0,
-            });
+            pts.push(StrokePoint { x, y, pressure, tilt_x: 0.0, tilt_y: 0.0, rotation: (theta.to_degrees() as f32), wheel: 0.0, time: (i as f64) * 8.0 });
         }
         pts
     }
@@ -214,10 +148,7 @@ impl Default for KisDistanceOracle {
 
 impl KisDistanceOracle {
     pub fn new() -> Self {
-        Self {
-            accum_distance: 0.0,
-            last_spacing: 0.0,
-        }
+        Self { accum_distance: 0.0, last_spacing: 0.0 }
     }
 
     /// Reset distance accumulator (Krita `resetAccumulators()`).
@@ -295,13 +226,7 @@ impl KisDistanceOracle {
 // ============================================================================
 
 /// Evaluates cubic Bézier curve at parameter $t \in [0.0, 1.0]$.
-pub fn eval_cubic_bezier_pt(
-    p0: (f64, f64),
-    p1: (f64, f64),
-    p2: (f64, f64),
-    p3: (f64, f64),
-    t: f64,
-) -> (f64, f64) {
+pub fn eval_cubic_bezier_pt(p0: (f64, f64), p1: (f64, f64), p2: (f64, f64), p3: (f64, f64), t: f64) -> (f64, f64) {
     let u = 1.0 - t;
     let tt = t * t;
     let uu = u * u;
@@ -314,12 +239,7 @@ pub fn eval_cubic_bezier_pt(
 }
 
 /// Measures the maximum deviation (flatness) of control points from the chord connecting endpoints.
-pub fn bezier_flatness(
-    p0: (f64, f64),
-    p1: (f64, f64),
-    p2: (f64, f64),
-    p3: (f64, f64),
-) -> f64 {
+pub fn bezier_flatness(p0: (f64, f64), p1: (f64, f64), p2: (f64, f64), p3: (f64, f64)) -> f64 {
     let (dx, dy) = (p3.0 - p0.0, p3.1 - p0.1);
     let chord_len = (dx * dx + dy * dy).sqrt();
     if chord_len < 1e-9 {
@@ -328,9 +248,7 @@ pub fn bezier_flatness(
         return d1.max(d2);
     }
     // Perpendicular distance from P to line P0->P3
-    let dist = |p: (f64, f64)| -> f64 {
-        ((dy * p.0 - dx * p.1 + p3.0 * p0.1 - p3.1 * p0.0).abs()) / chord_len
-    };
+    let dist = |p: (f64, f64)| -> f64 { ((dy * p.0 - dx * p.1 + p3.0 * p0.1 - p3.1 * p0.0).abs()) / chord_len };
     dist(p1).max(dist(p2))
 }
 
@@ -369,11 +287,7 @@ pub fn de_casteljau_subdivide(
 }
 
 /// Computes Catmull-Rom velocity tangent for intermediate point $P_i$.
-pub fn catmull_rom_tangent(
-    prev: &StrokePoint,
-    _curr: &StrokePoint,
-    next: &StrokePoint,
-) -> (f64, f64) {
+pub fn catmull_rom_tangent(prev: &StrokePoint, _curr: &StrokePoint, next: &StrokePoint) -> (f64, f64) {
     let dt = (next.time - prev.time).abs().max(1.0);
     let dx = (next.x - prev.x) / dt;
     let dy = (next.y - prev.y) / dt;
@@ -390,10 +304,7 @@ pub fn catmull_rom_tangent(
 /// - When $dP/dt < 0$ (pressure falling / stylus lifting), spatial filter weights
 ///   scale with $dP/dt \times \text{aggressiveness} \times (1.0 - P)$, rapidly pulling the stroke
 ///   toward the pen tip coordinate and eliminating trailing blunt cutoffs.
-pub fn apply_tail_aggressiveness(
-    points: &mut [StrokePoint],
-    tail_aggressiveness: f32,
-) {
+pub fn apply_tail_aggressiveness(points: &mut [StrokePoint], tail_aggressiveness: f32) {
     if points.len() < 2 || tail_aggressiveness <= 0.0 {
         return;
     }
@@ -422,11 +333,11 @@ pub fn apply_tail_aggressiveness(
 /// Discretized key for dab coverage mask caching.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct DabKey {
-    pub radius_quant: u16,   // e.g. radius * 4 (0.25px resolution)
-    pub hardness_quant: u8,  // 0..100
-    pub softness_quant: u8,  // 0..100
-    pub aspect_quant: u8,    // 0..100
-    pub angle_quant: u16,    // 0..360
+    pub radius_quant: u16,  // e.g. radius * 4 (0.25px resolution)
+    pub hardness_quant: u8, // 0..100
+    pub softness_quant: u8, // 0..100
+    pub aspect_quant: u8,   // 0..100
+    pub angle_quant: u16,   // 0..360
 }
 
 impl DabKey {
@@ -465,11 +376,7 @@ pub struct DabCacheOracle {
 
 impl DabCacheOracle {
     pub fn new(capacity: usize) -> Self {
-        Self {
-            capacity: capacity.max(1),
-            cache: Mutex::new(HashMap::new()),
-            counter: Mutex::new(0),
-        }
+        Self { capacity: capacity.max(1), cache: Mutex::new(HashMap::new()), counter: Mutex::new(0) }
     }
 
     pub fn len(&self) -> usize {
@@ -481,11 +388,7 @@ impl DabCacheOracle {
     }
 
     /// Retrieves or computes dab coverage mask.
-    pub fn get_or_create(
-        &self,
-        key: &DabKey,
-        generator: impl FnOnce() -> Arc<[f32]>,
-    ) -> (Arc<[f32]>, bool) {
+    pub fn get_or_create(&self, key: &DabKey, generator: impl FnOnce() -> Arc<[f32]>) -> (Arc<[f32]>, bool) {
         let mut cache = self.cache.lock().unwrap();
         let mut counter = self.counter.lock().unwrap();
         *counter += 1;
@@ -501,9 +404,7 @@ impl DabCacheOracle {
 
         // Evict LRU if capacity exceeded
         if cache.len() >= self.capacity
-            && let Some((&oldest_key, _)) = cache
-                .iter()
-                .min_by_key(|(_, (_, ts))| *ts)
+            && let Some((&oldest_key, _)) = cache.iter().min_by_key(|(_, (_, ts))| *ts)
         {
             cache.remove(&oldest_key);
         }
@@ -553,11 +454,7 @@ pub struct CoverageTile {
 
 impl CoverageTile {
     pub fn new(tx: i32, ty: i32) -> Self {
-        Self {
-            tx,
-            ty,
-            data: [0.0; COV_TILE_SIZE * COV_TILE_SIZE],
-        }
+        Self { tx, ty, data: [0.0; COV_TILE_SIZE * COV_TILE_SIZE] }
     }
 
     /// Blits coverage with saturation clamp at 1.0.
@@ -571,13 +468,7 @@ impl CoverageTile {
 }
 
 /// Blits a dab into a tiled canvas, returning touched tile coordinates.
-pub fn blit_dab_into_tiles(
-    tiles: &mut HashMap<(i32, i32), CoverageTile>,
-    center_x: f64,
-    center_y: f64,
-    radius: f64,
-    alpha: f32,
-) -> Vec<(i32, i32)> {
+pub fn blit_dab_into_tiles(tiles: &mut HashMap<(i32, i32), CoverageTile>, center_x: f64, center_y: f64, radius: f64, alpha: f32) -> Vec<(i32, i32)> {
     if alpha <= 0.0 || radius <= 0.0 || !center_x.is_finite() || !center_y.is_finite() {
         return Vec::new();
     }
@@ -638,15 +529,11 @@ impl Default for WindowsInkOracle {
 
 impl WindowsInkOracle {
     pub fn new() -> Self {
-        Self {
-            state: InkState::new(),
-        }
+        Self { state: InkState::new() }
     }
 
     pub fn with_bounds(bounds: DeviceBounds) -> Self {
-        Self {
-            state: InkState::new().with_bounds(bounds),
-        }
+        Self { state: InkState::new().with_bounds(bounds) }
     }
 
     /// Feeds a synthetic pointer packet and receives resulting sample update.
@@ -679,25 +566,13 @@ impl WindowsInkOracle {
 /// Asserts that a sequence of numbers is strictly monotonically non-decreasing.
 pub fn assert_monotonically_increasing(values: &[f32], tolerance: f32) {
     for i in 1..values.len() {
-        assert!(
-            values[i] >= values[i - 1] - tolerance,
-            "Monotonicity violation at index {}: {} < {}",
-            i,
-            values[i],
-            values[i - 1]
-        );
+        assert!(values[i] >= values[i - 1] - tolerance, "Monotonicity violation at index {}: {} < {}", i, values[i], values[i - 1]);
     }
 }
 
 /// Asserts that a sequence of numbers is strictly monotonically non-increasing.
 pub fn assert_monotonically_decreasing(values: &[f32], tolerance: f32) {
     for i in 1..values.len() {
-        assert!(
-            values[i] <= values[i - 1] + tolerance,
-            "Decreasing monotonicity violation at index {}: {} > {}",
-            i,
-            values[i],
-            values[i - 1]
-        );
+        assert!(values[i] <= values[i - 1] + tolerance, "Decreasing monotonicity violation at index {}: {} > {}", i, values[i], values[i - 1]);
     }
 }

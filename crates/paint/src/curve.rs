@@ -158,11 +158,7 @@ pub fn catmull_rom_tangent(p_prev: &StrokePoint, p_next: &StrokePoint) -> (f64, 
     let dx = p_next.x - p_prev.x;
     let dy = p_next.y - p_prev.y;
     let dt = p_next.time - p_prev.time;
-    let time_delta = if dt.is_finite() && dt > 0.0 {
-        dt.max(1.0)
-    } else {
-        1.0
-    };
+    let time_delta = if dt.is_finite() && dt > 0.0 { dt.max(1.0) } else { 1.0 };
     (dx / time_delta, dy / time_delta)
 }
 
@@ -180,15 +176,7 @@ fn midpoint(a: &StrokePoint, b: &StrokePoint) -> StrokePoint {
     }
 }
 
-fn subdivide_rec(
-    p0: &StrokePoint,
-    p1: &StrokePoint,
-    p2: &StrokePoint,
-    p3: &StrokePoint,
-    tol: f64,
-    depth: usize,
-    out: &mut Vec<StrokePoint>,
-) {
+fn subdivide_rec(p0: &StrokePoint, p1: &StrokePoint, p2: &StrokePoint, p3: &StrokePoint, tol: f64, depth: usize, out: &mut Vec<StrokePoint>) {
     let vx = p3.x - p0.x;
     let vy = p3.y - p0.y;
     let l = (vx * vx + vy * vy).sqrt();
@@ -233,13 +221,7 @@ pub fn de_casteljau_subdivide(p0: StrokePoint, p1: StrokePoint, p2: StrokePoint,
 /// Fits a smooth cubic Bézier curve between `p1` and `p2`, deriving Catmull-Rom tangent vectors
 /// from velocity using context points `p0` and `p3`, constructing control points from ray intersections
 /// and velocity similarity per Krita's `KisToolFreehandHelper`, and subdividing with De Casteljau to `flatness` px.
-pub fn fit_cubic_bezier_with_flatness(
-    p0: &StrokePoint,
-    p1: &StrokePoint,
-    p2: &StrokePoint,
-    p3: &StrokePoint,
-    flatness: f32,
-) -> Vec<StrokePoint> {
+pub fn fit_cubic_bezier_with_flatness(p0: &StrokePoint, p1: &StrokePoint, p2: &StrokePoint, p3: &StrokePoint, flatness: f32) -> Vec<StrokePoint> {
     let (dx, dy) = (p2.x - p1.x, p2.y - p1.y);
     let chord_len = (dx * dx + dy * dy).sqrt();
     if chord_len <= 1e-9 {
@@ -249,31 +231,15 @@ pub fn fit_cubic_bezier_with_flatness(
     // Corner detection: if the turn angle is sharp, do not curve across the corner.
     let (v0_x, v0_y) = (p1.x - p0.x, p1.y - p0.y);
     let l0 = v0_x.hypot(v0_y);
-    let sharp1 = if l0 > 1e-6 {
-        (v0_x * dx + v0_y * dy) / (l0 * chord_len) < 0.2
-    } else {
-        false
-    };
+    let sharp1 = if l0 > 1e-6 { (v0_x * dx + v0_y * dy) / (l0 * chord_len) < 0.2 } else { false };
 
-    let t1 = if sharp1 || l0 <= 1e-9 {
-        catmull_rom_tangent(p1, p2)
-    } else {
-        catmull_rom_tangent(p0, p2)
-    };
+    let t1 = if sharp1 || l0 <= 1e-9 { catmull_rom_tangent(p1, p2) } else { catmull_rom_tangent(p0, p2) };
 
     let (v2_x, v2_y) = (p3.x - p2.x, p3.y - p2.y);
     let l2 = v2_x.hypot(v2_y);
-    let sharp2 = if l2 > 1e-6 {
-        (dx * v2_x + dy * v2_y) / (chord_len * l2) < 0.2
-    } else {
-        false
-    };
+    let sharp2 = if l2 > 1e-6 { (dx * v2_x + dy * v2_y) / (chord_len * l2) < 0.2 } else { false };
 
-    let t2 = if sharp2 || l2 <= 1e-9 {
-        catmull_rom_tangent(p1, p2)
-    } else {
-        catmull_rom_tangent(p1, p3)
-    };
+    let t2 = if sharp2 || l2 <= 1e-9 { catmull_rom_tangent(p1, p2) } else { catmull_rom_tangent(p1, p3) };
 
     let v1 = t1.0.hypot(t1.1);
     let v2 = t2.0.hypot(t2.1);
@@ -289,17 +255,9 @@ pub fn fit_cubic_bezier_with_flatness(
     };
 
     // Unit tangent directions
-    let d1 = if v1 > 1e-6 {
-        (t1.0 / v1, t1.1 / v1)
-    } else {
-        (dx / chord_len, dy / chord_len)
-    };
+    let d1 = if v1 > 1e-6 { (t1.0 / v1, t1.1 / v1) } else { (dx / chord_len, dy / chord_len) };
 
-    let d2 = if v2 > 1e-6 {
-        (t2.0 / v2, t2.1 / v2)
-    } else {
-        (dx / chord_len, dy / chord_len)
-    };
+    let d2 = if v2 > 1e-6 { (t2.0 / v2, t2.1 / v2) } else { (dx / chord_len, dy / chord_len) };
 
     // Ray intersection:
     // Ray 1: p1 + alpha * d1
@@ -310,10 +268,7 @@ pub fn fit_cubic_bezier_with_flatness(
         let alpha = (dx * d2.1 - dy * d2.0) / det;
         let beta = (d1.0 * dy - d1.1 * dx) / det;
         if alpha > 1e-6 && beta > 1e-6 {
-            (
-                ((2.0 / 3.0) * alpha).min(chord_len / 3.0) * s,
-                ((2.0 / 3.0) * beta).min(chord_len / 3.0) * s,
-            )
+            (((2.0 / 3.0) * alpha).min(chord_len / 3.0) * s, ((2.0 / 3.0) * beta).min(chord_len / 3.0) * s)
         } else {
             ((chord_len / 3.0) * s, (chord_len / 3.0) * s)
         }
@@ -407,11 +362,7 @@ pub fn gaussian_smooth_with_tail(points: &[StrokePoint], tail_aggressiveness: f3
         let lifting = dp < 0.0;
         let pressure_drop = (-dp).max(0.0) as f64;
         let p_factor = (1.0 - curr.pressure.clamp(0.0, 1.0)) as f64;
-        let tail_scale = if lifting {
-            f64::from(tail_aggressiveness) * p_factor * (pressure_drop * 40.0).clamp(0.5, 40.0)
-        } else {
-            0.0
-        };
+        let tail_scale = if lifting { f64::from(tail_aggressiveness) * p_factor * (pressure_drop * 40.0).clamp(0.5, 40.0) } else { 0.0 };
 
         // The terminal point must ALWAYS anchor to the physical pen tip coordinate,
         // preventing one-sided convolution from shrinking the stroke tip backward.
@@ -600,13 +551,7 @@ mod tests {
             .enumerate()
             .map(|(idx, &deg)| {
                 let rad = deg.to_radians();
-                StrokePoint {
-                    x: r * rad.cos(),
-                    y: r * rad.sin(),
-                    pressure: 1.0 - (idx as f32 * 0.25),
-                    time: idx as f64 * 5.0,
-                    ..Default::default()
-                }
+                StrokePoint { x: r * rad.cos(), y: r * rad.sin(), pressure: 1.0 - (idx as f32 * 0.25), time: idx as f64 * 5.0, ..Default::default() }
             })
             .collect();
 
@@ -666,12 +611,8 @@ mod tests {
 
     #[test]
     fn test_spline_interpolator_interpolate_stroke() {
-        let pts = vec![
-            StrokePoint::new(0.0, 0.0, 1.0),
-            StrokePoint::new(20.0, 30.0, 0.8),
-            StrokePoint::new(60.0, 40.0, 0.6),
-            StrokePoint::new(100.0, 10.0, 0.3),
-        ];
+        let pts =
+            vec![StrokePoint::new(0.0, 0.0, 1.0), StrokePoint::new(20.0, 30.0, 0.8), StrokePoint::new(60.0, 40.0, 0.6), StrokePoint::new(100.0, 10.0, 0.3)];
 
         let interpolated = SplineInterpolator::interpolate_stroke(&pts, 0.5);
         assert!(interpolated.len() > pts.len());

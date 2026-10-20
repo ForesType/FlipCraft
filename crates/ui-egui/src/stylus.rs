@@ -515,11 +515,7 @@ impl Stylus {
             step_dx.hypot(step_dy) <= 2.0 && points[i][2] <= max_p
         });
 
-        if all_trailing_clustered {
-            best_idx
-        } else {
-            n - 1
-        }
+        if all_trailing_clustered { best_idx } else { n - 1 }
     }
 
     /// Evaluates trailing stroke points to determine if the pen lifted during an active stroke or flick
@@ -536,12 +532,7 @@ impl Stylus {
     /// 3. Standstill & pause rejection:
     ///    - Strokes that dwelled (> 45ms), completely stopped (v < 0.05), or braked sharply to a halt (v_last < 0.04
     ///      and v_last < speed * 0.15) reject tapering and commit as-is.
-    pub fn evaluate_flick_taper(
-        &self,
-        raw_points: &[[f64; 3]],
-        brush_radius: f64,
-        hover_target: Option<[f64; 2]>,
-    ) -> Option<FlickTaperParams> {
+    pub fn evaluate_flick_taper(&self, raw_points: &[[f64; 3]], brush_radius: f64, hover_target: Option<[f64; 2]>) -> Option<FlickTaperParams> {
         let anchor_idx = Self::find_visible_anchor(raw_points, brush_radius);
         if anchor_idx < raw_points.len() - 1 {
             // Trailing samples are clustered in-place inside the anchor sample's footprint
@@ -673,9 +664,7 @@ impl Stylus {
         let cutoff_width = 2.0 * r * p_last;
         let v_factor = (v_exit / 0.35).clamp(0.10, 1.0);
         let l_slow = (cutoff_width * 0.60 * v_factor).clamp(3.0, 14.0);
-        let l_fast = (cutoff_width * (1.1 + 0.4 * (speed - 0.50).max(0.0).min(2.0)))
-            .max(v_last * 25.0 * p_last)
-            .clamp(8.0, 45.0);
+        let l_fast = (cutoff_width * (1.1 + 0.4 * (speed - 0.50).max(0.0).min(2.0))).max(v_last * 25.0 * p_last).clamp(8.0, 45.0);
         let mut target_dist = (1.0 - speed_t) * l_slow + speed_t * l_fast;
 
         let exit_dir = if dist_last > 1e-4 {
@@ -751,18 +740,7 @@ impl Stylus {
         let incoming_slope = if s_trail > 1e-4 { (dp / s_trail).min(0.0) } else { 0.0 };
         let m0 = (incoming_slope * target_dist).clamp(-1.8 * p_last, 0.0) as f32;
 
-        Some(FlickTaperParams {
-            target_dist,
-            m0,
-            exit_dir,
-            speed,
-            v_last,
-            p_last,
-            p_retained,
-            kappa,
-            is_fast_flick,
-            speed_t,
-        })
+        Some(FlickTaperParams { target_dist, m0, exit_dir, speed, v_last, p_last, p_retained, kappa, is_fast_flick, speed_t })
     }
 
     /// Computes velocity-aware taper continuation points for a stroke release or flick.
@@ -775,12 +753,7 @@ impl Stylus {
     /// - For fast strokes: produces a sleek calligraphy flick taper.
     ///
     /// Returns `None` if the stroke stopped, dwelled (> 45ms), or was already tapered to <= 0.02.
-    pub fn flick_continuation(
-        &self,
-        raw_points: &mut [[f64; 3]],
-        brush_radius: f64,
-        hover_target: Option<[f64; 2]>,
-    ) -> Option<Vec<([f64; 3], f64)>> {
+    pub fn flick_continuation(&self, raw_points: &mut [[f64; 3]], brush_radius: f64, hover_target: Option<[f64; 2]>) -> Option<Vec<([f64; 3], f64)>> {
         let anchor_idx = Self::find_visible_anchor(raw_points, brush_radius);
         if anchor_idx < raw_points.len() - 1 {
             return None;
@@ -835,20 +808,12 @@ impl Stylus {
             let dx = raw_points[k][0] - raw_points[k - 2][0];
             let dy = raw_points[k][1] - raw_points[k - 2][1];
             let d = dx.hypot(dy);
-            if d > 0.1 {
-                (raw_points[k][2] - raw_points[k - 2][2]) / d
-            } else {
-                0.0
-            }
+            if d > 0.1 { (raw_points[k][2] - raw_points[k - 2][2]) / d } else { 0.0 }
         } else if k == 1 {
             let dx = raw_points[1][0] - raw_points[0][0];
             let dy = raw_points[1][1] - raw_points[0][1];
             let d = dx.hypot(dy);
-            if d > 0.1 {
-                (raw_points[1][2] - raw_points[0][2]) / d
-            } else {
-                0.0
-            }
+            if d > 0.1 { (raw_points[1][2] - raw_points[0][2]) / d } else { 0.0 }
         } else {
             0.0
         };
@@ -902,7 +867,6 @@ impl Stylus {
 
         Some(out)
     }
-
 }
 
 /// The touch contacts a pen makes, read from the raw input. egui takes every touch contact held
@@ -1367,11 +1331,7 @@ mod tests {
         let mut s = Stylus::default();
         s.clock_ms = 0.0;
         s.times = vec![0.0, 16.0, 32.0];
-        let mut pts = [
-            [10.0, 10.0, 0.7],
-            [35.0, 15.0, 0.5],
-            [65.0, 20.0, 0.35],
-        ];
+        let mut pts = [[10.0, 10.0, 0.7], [35.0, 15.0, 0.5], [65.0, 20.0, 0.35]];
 
         // 40px brush -> radius 20px
         let continuation = s.flick_continuation(&mut pts, 20.0, None);
@@ -1414,11 +1374,7 @@ mod tests {
         let mut s = Stylus::default();
         s.times = vec![0.0, 16.0, 32.0];
         // Curving stroke turning upward (+Y): theta increases from ~0.46 to ~0.93 rad
-        let mut curved_pts = [
-            [10.0, 10.0, 0.7],
-            [30.0, 20.0, 0.5],
-            [45.0, 40.0, 0.35],
-        ];
+        let mut curved_pts = [[10.0, 10.0, 0.7], [30.0, 20.0, 0.5], [45.0, 40.0, 0.35]];
 
         let continuation = s.flick_continuation(&mut curved_pts, 20.0, None).unwrap();
         // Tangent if straight: dx=15, dy=20 -> ratio dy/dx = 1.33
@@ -1560,16 +1516,8 @@ mod tests {
         // Moving stroke at 0.20 px/ms where pressure drops as artist lifts off:
         // 0.85 -> 0.85 -> 0.75 -> 0.45 -> 0.15
         s.times = vec![0.0, 35.0, 70.0, 105.0, 140.0];
-        let mut pts = [
-            [10.0, 10.0, 0.85],
-            [18.0, 10.0, 0.85],
-            [25.0, 10.0, 0.75],
-            [33.0, 10.0, 0.45],
-            [40.0, 10.0, 0.15],
-        ];
-        let cont = s
-            .flick_continuation(&mut pts, 20.0, None)
-            .expect("moving stroke with dropping pressure must taper cutoff cleanly to 0.0");
+        let mut pts = [[10.0, 10.0, 0.85], [18.0, 10.0, 0.85], [25.0, 10.0, 0.75], [33.0, 10.0, 0.45], [40.0, 10.0, 0.15]];
+        let cont = s.flick_continuation(&mut pts, 20.0, None).expect("moving stroke with dropping pressure must taper cutoff cleanly to 0.0");
         assert_eq!(cont.len(), 8);
         let first_x = pts.last().unwrap()[0];
         let last_x = cont.last().unwrap().0[0];
@@ -1593,10 +1541,7 @@ mod tests {
             [121.2, 100.0, 0.25], // 0.4px away
         ];
         // Must reject tapering: the big sample at x = 120 is the real end of the stroke!
-        assert!(
-            s.flick_continuation(&mut pts, 20.0, None).is_none(),
-            "tightly spaced samples during in-place lift must NOT add extra tapering"
-        );
+        assert!(s.flick_continuation(&mut pts, 20.0, None).is_none(), "tightly spaced samples during in-place lift must NOT add extra tapering");
     }
 
     #[test]
@@ -1669,10 +1614,7 @@ mod tests {
         ];
         // Must reject tapering: the stroke is a solid line intended to end with a rounded cap,
         // NOT sprout a needle taper from the cap!
-        assert!(
-            s.flick_continuation(&mut pts, 20.0, None).is_none(),
-            "steady capped stroke with sudden liftoff must produce NO tapering"
-        );
+        assert!(s.flick_continuation(&mut pts, 20.0, None).is_none(), "steady capped stroke with sudden liftoff must produce NO tapering");
     }
 
     #[test]
@@ -1681,19 +1623,9 @@ mod tests {
         // Hardware stylus reporting two rapid decompression samples at liftoff:
         // 0.85 -> 0.85 -> 0.85 -> 0.84 -> 0.83 -> 0.45 (lifting) -> 0.12 (breaking contact)
         s.times = vec![0.0, 30.0, 60.0, 90.0, 120.0, 135.0, 145.0];
-        let mut pts = [
-            [10.0, 10.0, 0.85],
-            [25.0, 10.0, 0.85],
-            [40.0, 10.0, 0.85],
-            [55.0, 10.0, 0.84],
-            [70.0, 10.0, 0.83],
-            [80.0, 10.0, 0.45],
-            [88.0, 10.0, 0.12],
-        ];
-        assert!(
-            s.flick_continuation(&mut pts, 20.0, None).is_none(),
-            "capped stroke with two liftoff decompression samples must reject tapering"
-        );
+        let mut pts =
+            [[10.0, 10.0, 0.85], [25.0, 10.0, 0.85], [40.0, 10.0, 0.85], [55.0, 10.0, 0.84], [70.0, 10.0, 0.83], [80.0, 10.0, 0.45], [88.0, 10.0, 0.12]];
+        assert!(s.flick_continuation(&mut pts, 20.0, None).is_none(), "capped stroke with two liftoff decompression samples must reject tapering");
     }
 
     #[test]
@@ -1709,9 +1641,7 @@ mod tests {
             [55.0, 10.0, 0.35],
             [65.0, 10.0, 0.08], // Sudden mechanical drop from 0.35 to 0.08 in 10px (cliff!)
         ];
-        let cont = s
-            .flick_continuation(&mut pts, 20.0, None)
-            .expect("tapered stroke must produce continuation");
+        let cont = s.flick_continuation(&mut pts, 20.0, None).expect("tapered stroke must produce continuation");
 
         // Continuation knots must decay strictly monotonically to 0.0 without inflection notches
         let mut prev_p = pts[4][2];

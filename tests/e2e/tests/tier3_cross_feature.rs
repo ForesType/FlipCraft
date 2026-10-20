@@ -443,12 +443,7 @@ fn test_t3_subframe_rate_compression_tail_pull() {
     let (samples, _) = ink_oracle.filter_stream(&raw_events);
     assert!(!samples.is_empty());
 
-    let mut points: Vec<StrokePoint> = samples.iter().map(|s| StrokePoint {
-        x: 100.0,
-        y: 50.0,
-        pressure: s.pressure,
-        ..Default::default()
-    }).collect();
+    let mut points: Vec<StrokePoint> = samples.iter().map(|s| StrokePoint { x: 100.0, y: 50.0, pressure: s.pressure, ..Default::default() }).collect();
 
     apply_tail_aggressiveness(&mut points, 10.0);
     assert!(points.len() >= 2);

@@ -210,11 +210,7 @@ impl HoverFlight {
             return 0.0;
         }
         let p0 = self.start_pressure;
-        let gamma = if p0 > 1e-4 {
-            (-self.m0 / p0).clamp(1.0, 2.5)
-        } else {
-            1.8
-        };
+        let gamma = if p0 > 1e-4 { (-self.m0 / p0).clamp(1.0, 2.5) } else { 1.8 };
         (p0 * (1.0 - u).powf(gamma)).clamp(0.0, p0)
     }
 
@@ -3142,44 +3138,31 @@ fn finalize_hover_flight(app: &mut PhotocraftApp, d: &mut Drag) {
 }
 
 /// Handles gesture release for tool strokes, triggering HoverFlight tracking for fast stylus flicks.
-fn handle_stroke_up(
-    app: &mut PhotocraftApp,
-    x: f64,
-    y: f64,
-    mods: egui::Modifiers,
-    events: &[egui::Event],
-    xf: &ViewXform,
-    ctx: &egui::Context,
-) {
+fn handle_stroke_up(app: &mut PhotocraftApp, x: f64, y: f64, mods: egui::Modifiers, events: &[egui::Event], xf: &ViewXform, ctx: &egui::Context) {
     let now_ms = app.stylus.clock_ms;
     let brush_radius = (app.session.tools.brush.size as f64 * 0.5).max(1.0);
-    let qualifies = app.drag.as_ref().is_some_and(|d| {
-        freehand_tool(d.tool)
-            && (d.is_stylus || app.stylus.sample().is_some())
-            && d.points.len() > 1
-            && d.hover_flight.is_none()
-    });
+    let qualifies = app
+        .drag
+        .as_ref()
+        .is_some_and(|d| freehand_tool(d.tool) && (d.is_stylus || app.stylus.sample().is_some()) && d.points.len() > 1 && d.hover_flight.is_none());
 
     let flight_params = if qualifies {
         let d = app.drag.as_mut().unwrap();
-        app.stylus
-            .evaluate_flick_taper(&d.points, brush_radius, None)
-            .filter(|params| params.is_fast_flick)
-            .map(|params| {
-                let pt_end = d.points.last().copied().unwrap();
-                HoverFlight {
-                    start_time_ms: now_ms,
-                    start_pressure: params.p_last as f32,
-                    m0: params.m0,
-                    target_dist: params.target_dist,
-                    accumulated_dist: 0.0,
-                    max_duration_ms: 100.0,
-                    last_pos: [pt_end[0], pt_end[1]],
-                    exit_dir: params.exit_dir,
-                    prev_step_dir: params.exit_dir,
-                    hover_points_count: 0,
-                }
-            })
+        app.stylus.evaluate_flick_taper(&d.points, brush_radius, None).filter(|params| params.is_fast_flick).map(|params| {
+            let pt_end = d.points.last().copied().unwrap();
+            HoverFlight {
+                start_time_ms: now_ms,
+                start_pressure: params.p_last as f32,
+                m0: params.m0,
+                target_dist: params.target_dist,
+                accumulated_dist: 0.0,
+                max_duration_ms: 100.0,
+                last_pos: [pt_end[0], pt_end[1]],
+                exit_dir: params.exit_dir,
+                prev_step_dir: params.exit_dir,
+                hover_points_count: 0,
+            }
+        })
     } else {
         None
     };
@@ -4038,7 +4021,11 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                 buttons.clicked = false;
             }
             app.hover_doc = ui.input(|i| i.pointer.latest_pos()).map(|p| xf.to_doc(p)).or(app.hover_doc);
-            let p = if app.drag.as_ref().is_some_and(|d| (d.is_stylus || app.stylus.sample().is_some() || d.points.iter().any(|p| p[2] != 1.0)) && !d.points.is_empty()) {
+            let p = if app
+                .drag
+                .as_ref()
+                .is_some_and(|d| (d.is_stylus || app.stylus.sample().is_some() || d.points.iter().any(|p| p[2] != 1.0)) && !d.points.is_empty())
+            {
                 app.drag.as_ref().unwrap().points.last().map(|q| [q[0], q[1]])
             } else {
                 response.interact_pointer_pos().map(|p| xf.to_doc(p)).or_else(|| app.drag.as_ref().and_then(|d| d.points.last().map(|q| [q[0], q[1]])))
@@ -4053,7 +4040,11 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         if press_stroke && !buttons.stopped && ui.input(|i| i.pointer.primary_released()) {
             buttons.clicked = false;
             app.hover_doc = ui.input(|i| i.pointer.latest_pos()).map(|p| xf.to_doc(p)).or(app.hover_doc);
-            let p = if app.drag.as_ref().is_some_and(|d| (d.is_stylus || app.stylus.sample().is_some() || d.points.iter().any(|p| p[2] != 1.0)) && !d.points.is_empty()) {
+            let p = if app
+                .drag
+                .as_ref()
+                .is_some_and(|d| (d.is_stylus || app.stylus.sample().is_some() || d.points.iter().any(|p| p[2] != 1.0)) && !d.points.is_empty())
+            {
                 app.drag.as_ref().unwrap().points.last().map(|q| [q[0], q[1]])
             } else {
                 response.interact_pointer_pos().map(|p| xf.to_doc(p)).or_else(|| app.drag.as_ref().and_then(|d| d.points.last().map(|q| [q[0], q[1]])))
@@ -9180,12 +9171,7 @@ mod rotation_preview_isolation_tests {
         tool_event(&mut app, ToolEvent::Move { x: 90.0, y: 100.0, pressure: 0.35 }, mods);
 
         // 2. Stylus lift occurs at t = 32ms.
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(90.0, 100.0),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(90.0, 100.0), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 90.0, 100.0, mods, &events, &xf, &ctx);
 
         // Drag must be retained in HoverFlight mode
@@ -9197,10 +9183,7 @@ mod rotation_preview_isolation_tests {
 
         // 3. Feed in-air hover positions following a curved upward arc
         // e.g. (105, 108), (120, 120)
-        let hover_events = vec![
-            egui::Event::PointerMoved(pos2(105.0, 108.0)),
-            egui::Event::PointerMoved(pos2(120.0, 120.0)),
-        ];
+        let hover_events = vec![egui::Event::PointerMoved(pos2(105.0, 108.0)), egui::Event::PointerMoved(pos2(120.0, 120.0))];
         let mut flight = app.drag.as_mut().unwrap().hover_flight.take().unwrap();
         for e in hover_events {
             if let egui::Event::PointerMoved(p) = e {
@@ -9254,12 +9237,7 @@ mod rotation_preview_isolation_tests {
         tool_event(&mut app, ToolEvent::Move { x: 52.0, y: 50.0, pressure: 0.75 }, mods);
 
         // Stylus lift occurs at t = 40ms
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(52.0, 50.0),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(52.0, 50.0), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 52.0, 50.0, mods, &events, &xf, &ctx);
 
         // A slow dab must NOT enter HoverFlight and must NOT have trailing continuation points added!
@@ -9293,12 +9271,7 @@ mod rotation_preview_isolation_tests {
         tool_event(&mut app, ToolEvent::Move { x: 51.5, y: 100.0, pressure: 0.6 }, mods);
 
         // Stylus lift occurs at t = 32ms
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(51.5, 100.0),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(51.5, 100.0), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 51.5, 100.0, mods, &events, &xf, &ctx);
 
         // Braking stroke must NOT enter HoverFlight!
@@ -9331,12 +9304,7 @@ mod rotation_preview_isolation_tests {
         app.stylus.feed.set(Some(crate::stylus::PenSample { pressure: 0.35, ..Default::default() }));
         tool_event(&mut app, ToolEvent::Move { x: 90.0, y: 100.0, pressure: 0.35 }, mods);
 
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(90.0, 100.0),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(90.0, 100.0), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 90.0, 100.0, mods, &events, &xf, &ctx);
         assert!(app.drag.is_some());
 
@@ -9379,12 +9347,7 @@ mod rotation_preview_isolation_tests {
         tool_event(&mut app, ToolEvent::Move { x: 80.0, y: 100.0, pressure: 0.84 }, mods);
 
         // Stylus lift occurs at t = 32ms
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(80.0, 100.0),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(80.0, 100.0), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 80.0, 100.0, mods, &events, &xf, &ctx);
 
         // Steady pressure stroke must NOT enter hover flight and must have no spike!
@@ -9418,12 +9381,7 @@ mod rotation_preview_isolation_tests {
         app.stylus.feed.set(Some(crate::stylus::PenSample { pressure: 0.35, ..Default::default() }));
         tool_event(&mut app, ToolEvent::Move { x: 80.0, y: 100.0, pressure: 0.35 }, mods);
 
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(80.0, 100.0),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(80.0, 100.0), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 80.0, 100.0, mods, &events, &xf, &ctx);
 
         // Must enter hover flight because pressure was rapidly decreasing!
@@ -9462,12 +9420,7 @@ mod rotation_preview_isolation_tests {
         app.stylus.feed.set(Some(crate::stylus::PenSample { pressure: 0.40, ..Default::default() }));
         tool_event(&mut app, ToolEvent::Move { x: 40.0, y: 100.0, pressure: 0.40 }, mods);
 
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(40.0, 100.0),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(40.0, 100.0), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 40.0, 100.0, mods, &events, &xf, &ctx);
 
         // Slow stroke must NOT stay open in HoverFlight mode; it commits immediately!
@@ -9510,12 +9463,7 @@ mod rotation_preview_isolation_tests {
         tool_event(&mut app, ToolEvent::Move { x: 51.5, y: 100.0, pressure: 0.6 }, mods);
 
         // Pen lifts and hovers in the air at (75.0, 110.0)
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(75.0, 110.0),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(75.0, 110.0), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 75.0, 110.0, mods, &events, &xf, &ctx);
 
         // Stroke must complete immediately with NO extra points added and NO hover spike
@@ -9560,12 +9508,7 @@ mod rotation_preview_isolation_tests {
         assert!(app.live_stroke.is_some(), "live stroke must be active for the dot");
 
         // Stylus lifts
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(50.4, 50.2),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(50.4, 50.2), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 50.4, 50.2, mods, &events, &xf, &ctx);
 
         // Must commit from live pixels without re-render mismatch (no square hole artifact)
@@ -9603,12 +9546,7 @@ mod rotation_preview_isolation_tests {
         assert!(app.live_stroke.is_some());
 
         // Pen lifts at (80, 100)
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(80.0, 100.0),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(80.0, 100.0), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 80.0, 100.0, mods, &events, &xf, &ctx);
 
         // 1. Gesture finishes immediately (no lingering hover flight)
@@ -9659,12 +9597,7 @@ mod rotation_preview_isolation_tests {
         tool_event(&mut app, ToolEvent::Move { x: 62.0, y: 100.0, pressure: 0.40 }, mods);
 
         // Pen lifts
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(62.0, 100.0),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(62.0, 100.0), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 62.0, 100.0, mods, &events, &xf, &ctx);
 
         // Must commit immediately without adding any continuation spike
@@ -9711,12 +9644,7 @@ mod rotation_preview_isolation_tests {
         tool_event(&mut app, ToolEvent::Move { x: 92.0, y: 100.0, pressure: 0.15 }, mods);
 
         // Pen lifts
-        let events = vec![egui::Event::PointerButton {
-            pos: pos2(92.0, 100.0),
-            button: PointerButton::Primary,
-            pressed: false,
-            modifiers: mods,
-        }];
+        let events = vec![egui::Event::PointerButton { pos: pos2(92.0, 100.0), button: PointerButton::Primary, pressed: false, modifiers: mods }];
         handle_stroke_up(&mut app, 92.0, 100.0, mods, &events, &xf, &ctx);
 
         // Must taper cleanly to zero pressure (extending 4 to 12px past 92.0 with final pressure 0.0)

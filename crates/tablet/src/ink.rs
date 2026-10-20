@@ -173,11 +173,7 @@ pub fn normalize_pressure(raw: u32, in_contact: bool, bounds: Option<DeviceBound
 
 /// Maps raw tilt angle to -90.0..=90.0 degrees.
 pub fn map_tilt(raw: i32, valid: bool) -> f32 {
-    if valid {
-        (raw as f32).clamp(-90.0, 90.0)
-    } else {
-        0.0
-    }
+    if valid { (raw as f32).clamp(-90.0, 90.0) } else { 0.0 }
 }
 
 /// Maps raw barrel rotation to 0.0..360.0 degrees.
@@ -350,13 +346,7 @@ impl State {
                 let tilt_y = map_tilt(e.tilt_y, (e.pen_mask & pen_mask::TILT_Y) != 0);
                 let rotation = map_rotation(e.rotation, (e.pen_mask & pen_mask::ROTATION) != 0);
 
-                let sample = Sample {
-                    pressure,
-                    tilt_x,
-                    tilt_y,
-                    rotation,
-                    eraser,
-                };
+                let sample = Sample { pressure, tilt_x, tilt_y, rotation, eraser };
 
                 // Apply deduplication and rate compression strictly to intermediate updates.
                 // DOWN and UP events MUST ALWAYS be delivered immediately.
@@ -380,46 +370,41 @@ impl State {
                     if self.compression_enabled
                         && let (Some(last_s), Some(last_e)) = (self.last_sample, self.last_event)
                     {
-                            let dt = e.timestamp.saturating_sub(self.last_emit_time);
-                            let curr_dx = e.x - last_e.x;
-                            let curr_dy = e.y - last_e.y;
-                            let dp = (sample.pressure - last_s.pressure).abs();
+                        let dt = e.timestamp.saturating_sub(self.last_emit_time);
+                        let curr_dx = e.x - last_e.x;
+                        let curr_dy = e.y - last_e.y;
+                        let dp = (sample.pressure - last_s.pressure).abs();
 
-                            // Eraser / tool flip must never be dropped.
-                            let is_eraser_flip = sample.eraser != last_s.eraser;
+                        // Eraser / tool flip must never be dropped.
+                        let is_eraser_flip = sample.eraser != last_s.eraser;
 
-                            // Pressure spike / extremum must never be dropped.
-                            let is_pressure_spike = dp >= 0.05;
+                        // Pressure spike / extremum must never be dropped.
+                        let is_pressure_spike = dp >= 0.05;
 
-                            // Trajectory inflection point (>45 degree corner) must never be dropped.
-                            let curr_len_sq = (curr_dx as i64).pow(2) + (curr_dy as i64).pow(2);
-                            let prev_len_sq = (self.last_dx as i64).pow(2) + (self.last_dy as i64).pow(2);
-                            let is_inflection = if curr_len_sq >= 4 && prev_len_sq >= 4 {
-                                let dot = (self.last_dx as i64) * (curr_dx as i64) + (self.last_dy as i64) * (curr_dy as i64);
-                                dot <= 0 || (dot * dot * 2 < prev_len_sq * curr_len_sq)
-                            } else {
-                                false
-                            };
+                        // Trajectory inflection point (>45 degree corner) must never be dropped.
+                        let curr_len_sq = (curr_dx as i64).pow(2) + (curr_dy as i64).pow(2);
+                        let prev_len_sq = (self.last_dx as i64).pow(2) + (self.last_dy as i64).pow(2);
+                        let is_inflection = if curr_len_sq >= 4 && prev_len_sq >= 4 {
+                            let dot = (self.last_dx as i64) * (curr_dx as i64) + (self.last_dy as i64) * (curr_dy as i64);
+                            dot <= 0 || (dot * dot * 2 < prev_len_sq * curr_len_sq)
+                        } else {
+                            false
+                        };
 
-                            // Stationary micro-jitter clamp: identical or sub-pixel trembling (never clamp tool flips).
-                            let is_micro_jitter = !is_eraser_flip
-                                && curr_dx.abs() < self.jitter_threshold_px
-                                && curr_dy.abs() < self.jitter_threshold_px
-                                && dp < 0.005;
+                        // Stationary micro-jitter clamp: identical or sub-pixel trembling (never clamp tool flips).
+                        let is_micro_jitter =
+                            !is_eraser_flip && curr_dx.abs() < self.jitter_threshold_px && curr_dy.abs() < self.jitter_threshold_px && dp < 0.005;
 
-                            if !is_eraser_flip
-                                && (is_micro_jitter
-                                    || (dt < self.min_interval_ms && !is_pressure_spike && !is_inflection))
-                            {
-                                if curr_dx * curr_dx + curr_dy * curr_dy >= 4 {
-                                    self.last_dx = curr_dx;
-                                    self.last_dy = curr_dy;
-                                }
-                                self.last_event = Some(*e);
-                                return Update::Keep;
+                        if !is_eraser_flip && (is_micro_jitter || (dt < self.min_interval_ms && !is_pressure_spike && !is_inflection)) {
+                            if curr_dx * curr_dx + curr_dy * curr_dy >= 4 {
+                                self.last_dx = curr_dx;
+                                self.last_dy = curr_dy;
                             }
+                            self.last_event = Some(*e);
+                            return Update::Keep;
                         }
                     }
+                }
 
                 // Update trajectory displacement history for non-trivial movements (>= 2px).
                 if let Some(last_e) = self.last_event {
@@ -476,8 +461,8 @@ pub fn compress_events(events: &[RawPointerEvent]) -> Vec<RawPointerEvent> {
                     if !duplicate {
                         let dt = ev.timestamp.saturating_sub(last_emitted_time);
                         let dp = (ev.raw_pressure as i32 - prev.raw_pressure as i32).abs();
-                        let is_eraser_flip = (ev.pen_flags & (pen_flag::INVERTED | pen_flag::ERASER))
-                            != (prev.pen_flags & (pen_flag::INVERTED | pen_flag::ERASER));
+                        let is_eraser_flip =
+                            (ev.pen_flags & (pen_flag::INVERTED | pen_flag::ERASER)) != (prev.pen_flags & (pen_flag::INVERTED | pen_flag::ERASER));
 
                         // Coalesce intermediate updates within 8ms unless pressure spike or eraser flip
                         if dt < 8 && dp < 100 && !is_eraser_flip {
@@ -522,10 +507,7 @@ mod tests {
         let b = DeviceBounds::LEVELS_8K;
         // On an 8k tablet, raw value 1024 is ~12.5% pressure, NEVER 100%!
         let at_1024 = normalize_pressure(1024, true, Some(b));
-        assert!(
-            (at_1024 - (1024.0 / 8191.0)).abs() < 1e-4,
-            "1024 on 8k must not saturate to 1.0; got {at_1024}"
-        );
+        assert!((at_1024 - (1024.0 / 8191.0)).abs() < 1e-4, "1024 on 8k must not saturate to 1.0; got {at_1024}");
         assert!(at_1024 < 0.15, "1024 on 8k must be around 0.125, got {at_1024}");
 
         let at_4096 = normalize_pressure(4096, true, Some(b));
@@ -566,21 +548,12 @@ mod tests {
     fn state_auto_detects_digitizer_bounds_on_unbounded_devices() {
         let mut st = State::new(); // No explicit bounds
         // Digitizer sends a high value (e.g. 8191)
-        let ev1 = RawPointerEvent {
-            message: message::WM_POINTERDOWN,
-            raw_pressure: 8191,
-            ..Default::default()
-        };
+        let ev1 = RawPointerEvent { message: message::WM_POINTERDOWN, raw_pressure: 8191, ..Default::default() };
         if let Update::Set(Some(s)) = st.handle(&ev1) {
             assert!((s.pressure - 1.0).abs() < 1e-4);
         }
         // Next event sends 2048 (should be ~0.25 on 8k scale)
-        let ev2 = RawPointerEvent {
-            message: message::WM_POINTERUPDATE,
-            raw_pressure: 2048,
-            timestamp: 10,
-            ..Default::default()
-        };
+        let ev2 = RawPointerEvent { message: message::WM_POINTERUPDATE, raw_pressure: 2048, timestamp: 10, ..Default::default() };
         if let Update::Set(Some(s)) = st.handle(&ev2) {
             assert!((s.pressure - (2048.0 / 8191.0)).abs() < 1e-3, "pressure on 8k was {}", s.pressure);
         }
@@ -615,15 +588,8 @@ mod tests {
         let mut st = State::new().with_bounds(DeviceBounds::LEVELS_8K);
 
         // Hover enter
-        let enter = RawPointerEvent {
-            message: message::WM_POINTERENTER,
-            pen_flags: pen_flag::NONE,
-            ..Default::default()
-        };
-        assert_eq!(
-            st.handle(&enter),
-            Update::Set(Some(Sample { pressure: 0.0, tilt_x: 0.0, tilt_y: 0.0, rotation: 0.0, eraser: false }))
-        );
+        let enter = RawPointerEvent { message: message::WM_POINTERENTER, pen_flags: pen_flag::NONE, ..Default::default() };
+        assert_eq!(st.handle(&enter), Update::Set(Some(Sample { pressure: 0.0, tilt_x: 0.0, tilt_y: 0.0, rotation: 0.0, eraser: false })));
 
         // Pen down with tip
         let down = RawPointerEvent {
@@ -646,11 +612,7 @@ mod tests {
         }
 
         // Pen up
-        let up = RawPointerEvent {
-            message: message::WM_POINTERUP,
-            pen_flags: pen_flag::NONE,
-            ..Default::default()
-        };
+        let up = RawPointerEvent { message: message::WM_POINTERUP, pen_flags: pen_flag::NONE, ..Default::default() };
         if let Update::Set(Some(s)) = st.handle(&up) {
             assert_eq!(s.pressure, 0.0);
             assert!(!s.eraser);
@@ -659,12 +621,7 @@ mod tests {
         }
 
         // Invert pen to eraser and press down
-        let eraser_down = RawPointerEvent {
-            message: message::WM_POINTERDOWN,
-            raw_pressure: 8191,
-            pen_flags: pen_flag::INVERTED,
-            ..Default::default()
-        };
+        let eraser_down = RawPointerEvent { message: message::WM_POINTERDOWN, raw_pressure: 8191, pen_flags: pen_flag::INVERTED, ..Default::default() };
         if let Update::Set(Some(s)) = st.handle(&eraser_down) {
             assert_eq!(s.pressure, 1.0);
             assert!(s.eraser, "eraser must be detected on INVERTED");
@@ -673,10 +630,7 @@ mod tests {
         }
 
         // Leave window
-        let leave = RawPointerEvent {
-            message: message::WM_POINTERLEAVE,
-            ..Default::default()
-        };
+        let leave = RawPointerEvent { message: message::WM_POINTERLEAVE, ..Default::default() };
         assert_eq!(st.handle(&leave), Update::Set(None));
         assert!(!st.eraser);
     }
@@ -684,14 +638,7 @@ mod tests {
     #[test]
     fn deduplication_drops_identical_intermediate_updates() {
         let mut st = State::new();
-        let ev1 = RawPointerEvent {
-            message: message::WM_POINTERUPDATE,
-            raw_pressure: 500,
-            x: 100,
-            y: 200,
-            timestamp: 10,
-            ..Default::default()
-        };
+        let ev1 = RawPointerEvent { message: message::WM_POINTERUPDATE, raw_pressure: 500, x: 100, y: 200, timestamp: 10, ..Default::default() };
         assert!(matches!(st.handle(&ev1), Update::Set(Some(_))));
 
         // Same exact event
@@ -699,58 +646,39 @@ mod tests {
         assert_eq!(st.handle(&ev2), Update::Keep, "exact duplicate update must be dropped");
 
         // Event with coordinate change is accepted after rate interval (>= 8ms)
-        let ev3 = RawPointerEvent {
-            x: 105,
-            timestamp: 20,
-            ..ev1
-        };
+        let ev3 = RawPointerEvent { x: 105, timestamp: 20, ..ev1 };
         assert!(matches!(st.handle(&ev3), Update::Set(Some(_))));
     }
 
     #[test]
     fn batch_event_compression_preserves_boundaries() {
-        let ev_down = RawPointerEvent {
-            message: message::WM_POINTERDOWN,
-            x: 10,
-            y: 10,
-            timestamp: 100,
-            ..Default::default()
-        };
-        let ev_u1 = RawPointerEvent {
+        let ev_down = RawPointerEvent { message: message::WM_POINTERDOWN, x: 10, y: 10, timestamp: 100, ..Default::default() };
+        let ev_u1 = RawPointerEvent { message: message::WM_POINTERUPDATE, x: 11, y: 10, timestamp: 101, ..Default::default() };
+        let ev_u2 = RawPointerEvent {
+            // Duplicate of u1
             message: message::WM_POINTERUPDATE,
             x: 11,
             y: 10,
             timestamp: 101,
             ..Default::default()
         };
-        let ev_u2 = RawPointerEvent { // Duplicate of u1
-            message: message::WM_POINTERUPDATE,
-            x: 11,
-            y: 10,
-            timestamp: 101,
-            ..Default::default()
-        };
-        let ev_u3 = RawPointerEvent { // Sub-millisecond cluster move
+        let ev_u3 = RawPointerEvent {
+            // Sub-millisecond cluster move
             message: message::WM_POINTERUPDATE,
             x: 11,
             y: 11,
             timestamp: 101,
             ..Default::default()
         };
-        let ev_u4 = RawPointerEvent { // Distinct move
+        let ev_u4 = RawPointerEvent {
+            // Distinct move
             message: message::WM_POINTERUPDATE,
             x: 20,
             y: 20,
             timestamp: 105,
             ..Default::default()
         };
-        let ev_up = RawPointerEvent {
-            message: message::WM_POINTERUP,
-            x: 20,
-            y: 20,
-            timestamp: 110,
-            ..Default::default()
-        };
+        let ev_up = RawPointerEvent { message: message::WM_POINTERUP, x: 20, y: 20, timestamp: 110, ..Default::default() };
 
         let raw = vec![ev_down, ev_u1, ev_u2, ev_u3, ev_u4, ev_up];
         let compressed = compress_events(&raw);

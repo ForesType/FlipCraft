@@ -132,13 +132,7 @@ fn test_t4_airbrush_taper() {
     for i in 1..=20 {
         let dist = (i as f64) * 10.0;
         let p = (0.8 * (1.0 - i as f32 / 20.0)).max(0.01);
-        pts.push(StrokePoint {
-            x: 100.0 + dist,
-            y: 100.0,
-            pressure: p,
-            time: 300.0 + (i as f64) * 8.0,
-            ..Default::default()
-        });
+        pts.push(StrokePoint { x: 100.0 + dist, y: 100.0, pressure: p, time: 300.0 + (i as f64) * 8.0, ..Default::default() });
     }
 
     let mut oracle = KisDistanceOracle::new();
@@ -343,11 +337,7 @@ fn test_t4_sketch_erase_resume_cycle() {
     }
 
     // Release stroke 1
-    let _ = oracle.feed(&RawPointerEvent {
-        message: ink::message::WM_POINTERUP,
-        pointer_id: 1,
-        ..Default::default()
-    });
+    let _ = oracle.feed(&RawPointerEvent { message: ink::message::WM_POINTERUP, pointer_id: 1, ..Default::default() });
 
     // 2. Flip stylus to physical eraser to correct a section
     let erase_stroke = RawPointerEvent {
@@ -364,12 +354,7 @@ fn test_t4_sketch_erase_resume_cycle() {
     }
 
     // Release eraser
-    let _ = oracle.feed(&RawPointerEvent {
-        message: ink::message::WM_POINTERUP,
-        pointer_id: 1,
-        pen_flags: ink::pen_flag::INVERTED,
-        ..Default::default()
-    });
+    let _ = oracle.feed(&RawPointerEvent { message: ink::message::WM_POINTERUP, pointer_id: 1, pen_flags: ink::pen_flag::INVERTED, ..Default::default() });
 
     // 3. Flip back to pen tip to continue sketch
     let resume_stroke = RawPointerEvent {

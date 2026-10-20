@@ -254,10 +254,8 @@ fn test_f3_pressure_taper_monotonic_convergence() {
 
 #[test]
 fn test_f3_high_aggressiveness_needle_tip_extrapolation() {
-    let mut points = vec![
-        StrokePoint { x: 100.0, y: 50.0, pressure: 0.6, ..Default::default() },
-        StrokePoint { x: 105.0, y: 50.0, pressure: 0.01, ..Default::default() },
-    ];
+    let mut points =
+        vec![StrokePoint { x: 100.0, y: 50.0, pressure: 0.6, ..Default::default() }, StrokePoint { x: 105.0, y: 50.0, pressure: 0.01, ..Default::default() }];
 
     apply_tail_aggressiveness(&mut points, 20.0);
     // Point 0 should be pulled almost completely to point 1 (105.0)
@@ -501,21 +499,9 @@ fn test_f6_wm_pointerupdate_continuous_stream() {
 #[test]
 fn test_f6_wm_pointerup_completes_stroke() {
     let mut oracle = WindowsInkOracle::new();
-    let _ = oracle.feed(&RawPointerEvent {
-        message: ink::message::WM_POINTERDOWN,
-        pointer_id: 1,
-        raw_pressure: 500,
-        timestamp: 10,
-        ..Default::default()
-    });
+    let _ = oracle.feed(&RawPointerEvent { message: ink::message::WM_POINTERDOWN, pointer_id: 1, raw_pressure: 500, timestamp: 10, ..Default::default() });
 
-    let up_event = RawPointerEvent {
-        message: ink::message::WM_POINTERUP,
-        pointer_id: 1,
-        raw_pressure: 0,
-        timestamp: 20,
-        ..Default::default()
-    };
+    let up_event = RawPointerEvent { message: ink::message::WM_POINTERUP, pointer_id: 1, raw_pressure: 0, timestamp: 20, ..Default::default() };
 
     let update = oracle.feed(&up_event);
     match update {
@@ -528,11 +514,7 @@ fn test_f6_wm_pointerup_completes_stroke() {
 
 #[test]
 fn test_f6_canvas_coordinate_transformation() {
-    let event = RawPointerEvent {
-        x: 1920,
-        y: 1080,
-        ..Default::default()
-    };
+    let event = RawPointerEvent { x: 1920, y: 1080, ..Default::default() };
     assert_eq!(event.x, 1920);
     assert_eq!(event.y, 1080);
 }
@@ -540,11 +522,7 @@ fn test_f6_canvas_coordinate_transformation() {
 #[test]
 fn test_f6_non_invasive_subclass_passthrough() {
     let mut oracle = WindowsInkOracle::new();
-    let mouse_event = RawPointerEvent {
-        pointer_type: ink::pointer_type::PT_MOUSE,
-        message: ink::message::WM_POINTERUPDATE,
-        ..Default::default()
-    };
+    let mouse_event = RawPointerEvent { pointer_type: ink::pointer_type::PT_MOUSE, message: ink::message::WM_POINTERUPDATE, ..Default::default() };
 
     let update = oracle.feed(&mouse_event);
     assert_eq!(update, Update::Keep, "Non-pen pointer events must pass through without hijacking");
@@ -557,14 +535,7 @@ fn test_f6_non_invasive_subclass_passthrough() {
 #[test]
 fn test_f7_deduplication_identical_coords() {
     let mut oracle = WindowsInkOracle::new();
-    let e1 = RawPointerEvent {
-        message: ink::message::WM_POINTERUPDATE,
-        x: 100,
-        y: 100,
-        raw_pressure: 500,
-        timestamp: 10,
-        ..Default::default()
-    };
+    let e1 = RawPointerEvent { message: ink::message::WM_POINTERUPDATE, x: 100, y: 100, raw_pressure: 500, timestamp: 10, ..Default::default() };
     let e2 = RawPointerEvent {
         message: ink::message::WM_POINTERUPDATE,
         x: 100,
@@ -642,18 +613,8 @@ fn test_f7_inflection_point_retention() {
 #[test]
 fn test_f7_stroke_terminal_points_guaranteed() {
     let mut oracle = WindowsInkOracle::new();
-    let down = RawPointerEvent {
-        message: ink::message::WM_POINTERDOWN,
-        pointer_id: 1,
-        timestamp: 10,
-        ..Default::default()
-    };
-    let up = RawPointerEvent {
-        message: ink::message::WM_POINTERUP,
-        pointer_id: 1,
-        timestamp: 100,
-        ..Default::default()
-    };
+    let down = RawPointerEvent { message: ink::message::WM_POINTERDOWN, pointer_id: 1, timestamp: 10, ..Default::default() };
+    let up = RawPointerEvent { message: ink::message::WM_POINTERUP, pointer_id: 1, timestamp: 100, ..Default::default() };
 
     let u_down = oracle.feed(&down);
     let u_up = oracle.feed(&up);
@@ -725,11 +686,7 @@ fn test_f9_pen_flag_inverted_triggers_eraser() {
     assert!(ink::is_eraser(inverted_flags), "PEN_FLAG_INVERTED must be detected as eraser");
 
     let mut oracle = WindowsInkOracle::new();
-    let event = RawPointerEvent {
-        pen_flags: inverted_flags,
-        raw_pressure: 500,
-        ..Default::default()
-    };
+    let event = RawPointerEvent { pen_flags: inverted_flags, raw_pressure: 500, ..Default::default() };
     match oracle.feed(&event) {
         Update::Set(Some(s)) => assert!(s.eraser, "Sample.eraser must be true when inverted"),
         other => panic!("Expected sample, got {:?}", other),
@@ -742,11 +699,7 @@ fn test_f9_eraser_button_flag_triggers_eraser() {
     assert!(ink::is_eraser(button_flags), "PEN_FLAG_ERASER must be detected as eraser");
 
     let mut oracle = WindowsInkOracle::new();
-    let event = RawPointerEvent {
-        pen_flags: button_flags,
-        raw_pressure: 500,
-        ..Default::default()
-    };
+    let event = RawPointerEvent { pen_flags: button_flags, raw_pressure: 500, ..Default::default() };
     match oracle.feed(&event) {
         Update::Set(Some(s)) => assert!(s.eraser),
         other => panic!("Expected sample, got {:?}", other),

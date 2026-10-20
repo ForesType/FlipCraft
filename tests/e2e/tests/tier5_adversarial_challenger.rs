@@ -5,13 +5,13 @@
 //! driver packet flooding (10k packets in 2ms), 16k/8k pressure scaling,
 //! and tilt/rotation boundaries.
 
-use std::time::Instant;
 use photocraft_e2e_tests::*;
 use photocraft_paint::brush::{BrushSettings, Control};
+use photocraft_paint::curve::{apply_tail_aggressiveness, catmull_rom_tangent, fit_cubic_bezier};
 use photocraft_paint::dynamics::{DabGenerator, DistanceAccumulator, StepResult};
-use photocraft_paint::curve::{apply_tail_aggressiveness, fit_cubic_bezier, catmull_rom_tangent};
-use photocraft_tablet::ink::{self, DeviceBounds, RawPointerEvent, State as InkState, normalize_pressure, map_tilt, map_rotation, is_eraser, compress_events};
 use photocraft_tablet::Update;
+use photocraft_tablet::ink::{self, DeviceBounds, RawPointerEvent, State as InkState, compress_events, is_eraser, map_rotation, map_tilt, normalize_pressure};
+use std::time::Instant;
 
 // ============================================================================
 // 1. Extreme Stroke Dynamics: Ultra-Fast Flicks & Pressure Collapse
@@ -22,12 +22,7 @@ fn test_adversarial_ultra_fast_flick_50000_px_s_taper() {
     // 50,000 px/s velocity: in 10ms, moves 500 px.
     // Pressure instantaneously collapses from 1.0 to 0.001.
     // Must achieve needle-sharp tapering with zero dab starvation.
-    let mut brush = BrushSettings {
-        size: 100.0,
-        spacing: 0.25,
-        spacing_enabled: true,
-        ..Default::default()
-    };
+    let mut brush = BrushSettings { size: 100.0, spacing: 0.25, spacing_enabled: true, ..Default::default() };
     brush.shape_dynamics.enabled = true;
     brush.shape_dynamics.size.control = Control::PenPressure;
     brush.shape_dynamics.size.minimum = 0.01; // minimum size = 1px
@@ -45,23 +40,14 @@ fn test_adversarial_ultra_fast_flick_50000_px_s_taper() {
         // Instantaneous pressure collapse: starts at 1.0, plunges to 0.001
         let pressure = if i == 0 { 1.0 } else { (1.0 - t).powi(4).max(0.001) as f32 };
         let time = t * 10.0; // 10ms total = 50,000 px/s
-        pts.push(StrokePoint {
-            x,
-            y,
-            pressure,
-            tilt_x: 0.0,
-            tilt_y: 0.0,
-            rotation: 0.0,
-            wheel: 0.0,
-            time,
-        });
+        pts.push(StrokePoint { x, y, pressure, tilt_x: 0.0, tilt_y: 0.0, rotation: 0.0, wheel: 0.0, time });
     }
 
     dab_generator.push(&pts, &mut dabs, &mut dual);
     dab_generator.finish(&mut dabs, &mut dual);
 
     assert!(!dabs.is_empty(), "50,000 px/s flick must generate dabs without starvation");
-    
+
     // Verify needle-sharp tapering: diameter of final dabs must reach sub-pixel / micro-scale
     let first_dabs_radius = dabs[0].radius;
     let last_dabs_radius = dabs.last().unwrap().radius;
@@ -258,7 +244,7 @@ fn test_adversarial_10000_packet_flood_within_2ms() {
     for ev in &stream {
         match state.handle(ev) {
             Update::Set(Some(_)) => delivered += 1,
-            Update::Set(None) => {},
+            Update::Set(None) => {}
             Update::Keep => _dropped += 1,
         }
     }
@@ -335,34 +321,19 @@ fn test_adversarial_eraser_inversion_and_flags() {
 
     // Mid-stroke flip test
     let mut state = InkState::new();
-    let down = RawPointerEvent {
-        message: ink::message::WM_POINTERDOWN,
-        pen_flags: ink::pen_flag::NONE,
-        raw_pressure: 500,
-        ..Default::default()
-    };
+    let down = RawPointerEvent { message: ink::message::WM_POINTERDOWN, pen_flags: ink::pen_flag::NONE, raw_pressure: 500, ..Default::default() };
     if let Update::Set(Some(s)) = state.handle(&down) {
         assert!(!s.eraser, "Pen tip should not be eraser");
     }
 
-    let mid_flip = RawPointerEvent {
-        message: ink::message::WM_POINTERUPDATE,
-        pen_flags: ink::pen_flag::INVERTED,
-        raw_pressure: 500,
-        timestamp: 50,
-        ..Default::default()
-    };
+    let mid_flip =
+        RawPointerEvent { message: ink::message::WM_POINTERUPDATE, pen_flags: ink::pen_flag::INVERTED, raw_pressure: 500, timestamp: 50, ..Default::default() };
     if let Update::Set(Some(s)) = state.handle(&mid_flip) {
         assert!(s.eraser, "Inverted pen flag mid-stroke must set eraser true");
     }
 
-    let flip_back = RawPointerEvent {
-        message: ink::message::WM_POINTERUPDATE,
-        pen_flags: ink::pen_flag::NONE,
-        raw_pressure: 500,
-        timestamp: 100,
-        ..Default::default()
-    };
+    let flip_back =
+        RawPointerEvent { message: ink::message::WM_POINTERUPDATE, pen_flags: ink::pen_flag::NONE, raw_pressure: 500, timestamp: 100, ..Default::default() };
     if let Update::Set(Some(s)) = state.handle(&flip_back) {
         assert!(!s.eraser, "Flipping back to tip must set eraser false");
     }
@@ -413,7 +384,7 @@ fn test_empirical_investigation_rate_compression_behavior() {
     for ev in &stream {
         match state.handle(ev) {
             Update::Set(Some(_)) => delivered += 1,
-            Update::Set(None) => {},
+            Update::Set(None) => {}
             Update::Keep => _dropped += 1,
         }
     }
@@ -425,11 +396,7 @@ fn test_empirical_investigation_rate_compression_behavior() {
 fn test_empirical_investigation_8k_auto_detect_pressure_bias() {
     let mut state = InkState::new();
     let raw_p = 41u32;
-    let tap = RawPointerEvent {
-        message: ink::message::WM_POINTERDOWN,
-        raw_pressure: raw_p,
-        ..Default::default()
-    };
+    let tap = RawPointerEvent { message: ink::message::WM_POINTERDOWN, raw_pressure: raw_p, ..Default::default() };
 
     if let Update::Set(Some(s)) = state.handle(&tap) {
         let expected_with_8k = normalize_pressure(raw_p, true, Some(DeviceBounds::LEVELS_8K));

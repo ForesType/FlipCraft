@@ -10,11 +10,9 @@ use std::time::Instant;
 
 use photocraft_color::PixelFormat;
 use photocraft_geom::Rect;
-use photocraft_paint::brush::{BrushSettings, Dynamic, Scattering, ShapeDynamics, Texture};
-use photocraft_paint::render::{
-    rasterize_mask_for_key, CoverageMap, DabCache, DabKey, StrokeRenderer,
-};
 use photocraft_paint::StrokePoint;
+use photocraft_paint::brush::{BrushSettings, Dynamic, Scattering, ShapeDynamics, Texture};
+use photocraft_paint::render::{CoverageMap, DabCache, DabKey, StrokeRenderer, rasterize_mask_for_key};
 use photocraft_raster::Surface;
 
 // ============================================================================
@@ -23,12 +21,7 @@ use photocraft_raster::Surface;
 
 /// Helper to simulate an interactive multi-chunk stroke on a large 6016x6016 layer
 /// and measure the per-chunk mean and worst latencies.
-fn profile_stroke_chunks(
-    brush: &BrushSettings,
-    point_count: usize,
-    chunk_size: usize,
-    fmt: PixelFormat,
-) -> (f64, f64, f64, f64, f64, usize) {
+fn profile_stroke_chunks(brush: &BrushSettings, point_count: usize, chunk_size: usize, fmt: PixelFormat) -> (f64, f64, f64, f64, f64, usize) {
     let n = 6016;
     let mut s = Surface::with_default(fmt, &photocraft_raster::from_rgba(&fmt, [1.0; 4]));
     s.fill_rect(Rect::new(0, 0, n, n), &photocraft_raster::from_rgba(&fmt, [0.8, 0.7, 0.6, 1.0]));
@@ -38,11 +31,7 @@ fn profile_stroke_chunks(
             let t = i as f64 / (point_count - 1).max(1) as f64;
             StrokePoint {
                 time: i as f64 * 8.0,
-                ..StrokePoint::new(
-                    300.0 + t * 5400.0,
-                    3000.0 + (t * 12.0).sin() * 2000.0,
-                    0.6 + 0.4 * (t * 30.0).sin().abs() as f32,
-                )
+                ..StrokePoint::new(300.0 + t * 5400.0, 3000.0 + (t * 12.0).sin() * 2000.0, 0.6 + 0.4 * (t * 30.0).sin().abs() as f32)
             }
         })
         .collect();
@@ -78,28 +67,16 @@ fn profile_stroke_chunks(
 
 #[test]
 fn test_perf_200px_solid_round_brush_sustains_60fps() {
-    let brush = BrushSettings {
-        size: 200.0,
-        hardness: 0.8,
-        spacing: 0.25,
-        ..Default::default()
-    };
-    let (mean_ms, worst_ms, total_ms, push_ms, comp_ms, dabs) =
-        profile_stroke_chunks(&brush, 500, 16, PixelFormat::RGBA8);
+    let brush = BrushSettings { size: 200.0, hardness: 0.8, spacing: 0.25, ..Default::default() };
+    let (mean_ms, worst_ms, total_ms, push_ms, comp_ms, dabs) = profile_stroke_chunks(&brush, 500, 16, PixelFormat::RGBA8);
 
     println!(
         "[PERF 200px Solid 16pt] dabs: {dabs}, total: {total_ms:.2}ms (push: {push_ms:.2}ms, comp: {comp_ms:.2}ms), mean/chunk: {mean_ms:.2}ms, worst/chunk: {worst_ms:.2}ms"
     );
 
     // Invariant: dab rendering (push) is well below frame budget (<16.6ms), while full chunk stays interactive (<25ms)
-    assert!(
-        push_ms < 16.6,
-        "200px solid round dab push latency ({push_ms:.2}ms) must sustain >60 FPS (<16.6ms)"
-    );
-    assert!(
-        mean_ms < 60.0,
-        "200px solid round brush mean chunk latency ({mean_ms:.2}ms) must remain interactive (<60ms)"
-    );
+    assert!(push_ms < 16.6, "200px solid round dab push latency ({push_ms:.2}ms) must sustain >60 FPS (<16.6ms)");
+    assert!(mean_ms < 60.0, "200px solid round brush mean chunk latency ({mean_ms:.2}ms) must remain interactive (<60ms)");
     assert!(dabs > 50, "Stroke must generate dabs (generated: {dabs})");
 }
 
@@ -108,51 +85,30 @@ fn test_perf_frame_tick_chunk_latency_200px_to_500px() {
     // In interactive UI frame dispatch (at 60Hz/120Hz), compressed tablet events
     // are fed per-frame tick in 2-point chunks (representing 16.6ms of input).
     for &size in &[200.0, 350.0, 500.0] {
-        let brush = BrushSettings {
-            size,
-            hardness: 0.7,
-            spacing: 0.25,
-            ..Default::default()
-        };
+        let brush = BrushSettings { size, hardness: 0.7, spacing: 0.25, ..Default::default() };
         // 2-point chunk corresponds to ~16.6ms interactive frame tick (120Hz digitizer compressed)
-        let (mean_2pt, worst_2pt, total_2pt, push_2pt, comp_2pt, dabs) =
-            profile_stroke_chunks(&brush, 500, 2, PixelFormat::RGBA8);
+        let (mean_2pt, worst_2pt, total_2pt, push_2pt, comp_2pt, dabs) = profile_stroke_chunks(&brush, 500, 2, PixelFormat::RGBA8);
 
         println!(
             "[FRAME-TICK PERF {size}px (2pt/frame)]: mean: {mean_2pt:.2}ms (push: {push_2pt:.2}ms, comp: {comp_2pt:.2}ms), worst: {worst_2pt:.2}ms, total: {total_2pt:.2}ms, dabs: {dabs}"
         );
 
         // Dab rendering push time must always be well within frame budget
-        assert!(
-            push_2pt < 10.0,
-            "Brush size {size}px dab push latency ({push_2pt:.2}ms) must be <10ms"
-        );
+        assert!(push_2pt < 10.0, "Brush size {size}px dab push latency ({push_2pt:.2}ms) must be <10ms");
 
         if size <= 350.0 {
-            assert!(
-                mean_2pt < 16.6,
-                "Brush size {size}px at 2-point frame tick must sustain >60 FPS (<16.6ms), got {mean_2pt:.2}ms"
-            );
+            assert!(mean_2pt < 16.6, "Brush size {size}px at 2-point frame tick must sustain >60 FPS (<16.6ms), got {mean_2pt:.2}ms");
         } else {
             // 500px brush sustains interactive framerate (~50+ FPS)
-            assert!(
-                mean_2pt < 25.0,
-                "500px brush at 2-point frame tick must sustain >40 FPS (<25ms), got {mean_2pt:.2}ms"
-            );
+            assert!(mean_2pt < 25.0, "500px brush at 2-point frame tick must sustain >40 FPS (<25ms), got {mean_2pt:.2}ms");
         }
     }
 }
 
 #[test]
 fn test_perf_500px_batch_chunk_characterization() {
-    let brush = BrushSettings {
-        size: 500.0,
-        hardness: 0.5,
-        spacing: 0.25,
-        ..Default::default()
-    };
-    let (mean_ms, worst_ms, total_ms, push_ms, comp_ms, dabs) =
-        profile_stroke_chunks(&brush, 500, 16, PixelFormat::RGBA8);
+    let brush = BrushSettings { size: 500.0, hardness: 0.5, spacing: 0.25, ..Default::default() };
+    let (mean_ms, worst_ms, total_ms, push_ms, comp_ms, dabs) = profile_stroke_chunks(&brush, 500, 16, PixelFormat::RGBA8);
 
     println!(
         "[PERF 500px Solid 16pt Batch] dabs: {dabs}, total: {total_ms:.2}ms (push: {push_ms:.2}ms, comp: {comp_ms:.2}ms), mean/chunk: {mean_ms:.2}ms, worst/chunk: {worst_ms:.2}ms"
@@ -171,43 +127,21 @@ fn test_perf_200px_textured_scattered_brush_throughput() {
         spacing: 0.25,
         pressure_size: false,
         seed: 1,
-        shape_dynamics: ShapeDynamics {
-            enabled: true,
-            size: Dynamic::jitter(0.3),
-            angle: Dynamic::jitter(1.0),
-            ..Default::default()
-        },
-        scattering: Scattering {
-            enabled: true,
-            scatter: Dynamic::jitter(1.0),
-            both_axes: true,
-            count: 2,
-            ..Default::default()
-        },
-        texture: Texture {
-            enabled: true,
-            depth: 0.7,
-            ..Default::default()
-        },
+        shape_dynamics: ShapeDynamics { enabled: true, size: Dynamic::jitter(0.3), angle: Dynamic::jitter(1.0), ..Default::default() },
+        scattering: Scattering { enabled: true, scatter: Dynamic::jitter(1.0), both_axes: true, count: 2, ..Default::default() },
+        texture: Texture { enabled: true, depth: 0.7, ..Default::default() },
         ..Default::default()
     };
 
-    let (mean_ms, worst_ms, total_ms, push_ms, comp_ms, dabs) =
-        profile_stroke_chunks(&brush, 500, 16, PixelFormat::RGBA8);
+    let (mean_ms, worst_ms, total_ms, push_ms, comp_ms, dabs) = profile_stroke_chunks(&brush, 500, 16, PixelFormat::RGBA8);
 
     println!(
         "[PERF 200px Textured+Scattered] dabs: {dabs}, total: {total_ms:.2}ms (push: {push_ms:.2}ms, comp: {comp_ms:.2}ms), mean/chunk: {mean_ms:.2}ms, worst/chunk: {worst_ms:.2}ms"
     );
 
     // Matches bench_brush baseline: dab push latency is well under 16.6ms frame budget, chunk total remains interactive (<60ms)
-    assert!(
-        push_ms < 16.6,
-        "Dab push latency ({push_ms:.2}ms) must remain well under frame budget (<16.6ms)"
-    );
-    assert!(
-        mean_ms < 120.0,
-        "200px textured scattered brush mean latency ({mean_ms:.2}ms) must remain within interactive budget (<120ms)"
-    );
+    assert!(push_ms < 16.6, "Dab push latency ({push_ms:.2}ms) must remain well under frame budget (<16.6ms)");
+    assert!(mean_ms < 120.0, "200px textured scattered brush mean latency ({mean_ms:.2}ms) must remain within interactive budget (<120ms)");
 }
 
 // ============================================================================
@@ -250,19 +184,10 @@ fn test_dab_cache_thrashing_1000_randomized_radii_enforces_bounds() {
             rasterize_mask_for_key(key)
         });
         assert!(!mask.is_empty(), "Mask must not be empty");
-        assert!(
-            cache.len() <= capacity,
-            "Cache length ({}) must NEVER exceed capacity ({}) during thrashing",
-            cache.len(),
-            capacity
-        );
+        assert!(cache.len() <= capacity, "Cache length ({}) must NEVER exceed capacity ({}) during thrashing", cache.len(), capacity);
     }
 
-    assert_eq!(
-        cache.len(),
-        capacity,
-        "Cache must be fully saturated at exactly its capacity"
-    );
+    assert_eq!(cache.len(), capacity, "Cache must be fully saturated at exactly its capacity");
 
     // Re-query the most recently inserted keys (the last `capacity` items)
     let recent_keys = &distinct_keys[1000 - capacity..];
@@ -276,13 +201,8 @@ fn test_dab_cache_thrashing_1000_randomized_radii_enforces_bounds() {
 
     // The most recently inserted keys should have a high hit rate
     let extra_rasterized = rasterize_count - prev_rasterize_count;
-    println!(
-        "[DabCache Thrash 1000] Saturate cap={capacity}, extra rasterized on recent={extra_rasterized}"
-    );
-    assert!(
-        extra_rasterized < capacity / 2,
-        "Recent keys should be retained in LRU cache"
-    );
+    println!("[DabCache Thrash 1000] Saturate cap={capacity}, extra rasterized on recent={extra_rasterized}");
+    assert!(extra_rasterized < capacity / 2, "Recent keys should be retained in LRU cache");
 
     // Verify clear empties the cache completely
     cache.clear();
@@ -319,10 +239,7 @@ fn test_dab_cache_lru_generational_eviction_order() {
     // k4 should be present
     assert!(cache.get(&k4).is_some(), "k4 was just inserted, must be present");
     // k2 was the oldest unaccessed and must have been evicted!
-    assert!(
-        cache.get(&k2).is_none(),
-        "k2 was oldest LRU entry, must be evicted"
-    );
+    assert!(cache.get(&k2).is_none(), "k2 was oldest LRU entry, must be evicted");
 }
 
 #[test]
@@ -363,15 +280,8 @@ fn test_dab_cache_multi_threaded_high_concurrency_stress() {
                     hits += 1;
                 }
 
-                assert!(
-                    !mask.is_empty(),
-                    "Thread {thread_id} received empty mask at iteration {i}"
-                );
-                assert_eq!(
-                    mask.len(),
-                    (mask.size * mask.size) as usize,
-                    "Mask size invariant violated"
-                );
+                assert!(!mask.is_empty(), "Thread {thread_id} received empty mask at iteration {i}");
+                assert_eq!(mask.len(), (mask.size * mask.size) as usize, "Mask size invariant violated");
             }
 
             (thread_id, hits, misses)
@@ -392,10 +302,7 @@ fn test_dab_cache_multi_threaded_high_concurrency_stress() {
         cache.len()
     );
 
-    assert!(
-        cache.len() <= 64,
-        "Cache capacity bound (64) must be strictly respected under concurrency"
-    );
+    assert!(cache.len() <= 64, "Cache capacity bound (64) must be strictly respected under concurrency");
     assert!(total_hits > 0, "Concurrent cache must produce hits");
 }
 
@@ -408,14 +315,8 @@ fn test_dab_cache_arc_identity_and_zero_duplicate_allocation() {
     let mask2 = cache.get_mask_or_create(&key, || panic!("Should not re-rasterize!"));
     let arc_slice = cache.get(&key).expect("Key should exist in cache");
 
-    assert!(
-        Arc::ptr_eq(&mask1.data, &mask2.data),
-        "Repeated cache queries must share the exact same underlying Arc data"
-    );
-    assert!(
-        Arc::ptr_eq(&mask1.data, &arc_slice),
-        "get() and get_mask_or_create() must return identical Arc pointers"
-    );
+    assert!(Arc::ptr_eq(&mask1.data, &mask2.data), "Repeated cache queries must share the exact same underlying Arc data");
+    assert!(Arc::ptr_eq(&mask1.data, &arc_slice), "get() and get_mask_or_create() must return identical Arc pointers");
 }
 
 // ============================================================================
@@ -440,18 +341,11 @@ fn test_500px_brush_tile_blitting_spans_multiple_tiles_seamlessly() {
     cov.accumulate_dab(rect, &mask.data, 1.0, 1.0, None, None);
 
     // A 500px dab covers diameter ~500px / 64 ≈ 8 tiles across in both dimensions (≈ 50+ tiles)
-    assert!(
-        cov.tiles_count() >= 49,
-        "500px dab at (64, 64) must span >= 49 tiles, touched: {}",
-        cov.tiles_count()
-    );
+    assert!(cov.tiles_count() >= 49, "500px dab at (64, 64) must span >= 49 tiles, touched: {}", cov.tiles_count());
 
     // Verify center pixel has coverage 1.0
     let center_cov = cov.get(cx, cy);
-    assert!(
-        (center_cov - 1.0).abs() < 1e-4,
-        "Center pixel coverage must be 1.0, got {center_cov}"
-    );
+    assert!((center_cov - 1.0).abs() < 1e-4, "Center pixel coverage must be 1.0, got {center_cov}");
 
     // Verify seamless continuity across tile boundaries:
     // Tile boundary between x = 63 and x = 64 across various y positions.
@@ -466,10 +360,7 @@ fn test_500px_brush_tile_blitting_spans_multiple_tiles_seamlessly() {
         // x = 64 is center column
         // The difference between x=63 and x=64 must be smooth (bounded by falloff gradient)
         let diff = (left_px - right_px).abs();
-        assert!(
-            diff < 0.05,
-            "Tile boundary seam at y={test_y}: |cov(63) - cov(64)| = {diff} > 0.05 (left={left_px}, right={right_px})"
-        );
+        assert!(diff < 0.05, "Tile boundary seam at y={test_y}: |cov(63) - cov(64)| = {diff} > 0.05 (left={left_px}, right={right_px})");
     }
 }
 
@@ -492,10 +383,7 @@ fn test_500px_brush_negative_tile_coordinates_and_zero_buffer_overflow() {
     assert!(cov.tiles_count() > 0);
     // Center pixel must reflect accumulated value
     let center_val = cov.get(cx, cy);
-    assert!(
-        (center_val - 0.8).abs() < 1e-3,
-        "Center val in negative coords must be ~0.8, got {center_val}"
-    );
+    assert!((center_val - 0.8).abs() < 1e-3, "Center val in negative coords must be ~0.8, got {center_val}");
 
     // Positive coordinate far away should be 0.0
     assert_eq!(cov.get(1000, 1000), 0.0);
@@ -521,10 +409,7 @@ fn test_500px_brush_radial_monotonicity_no_banding() {
 
     for dx in 1..=rr {
         let curr = cov.get(cx + dx, cy);
-        assert!(
-            curr <= prev + 1e-5,
-            "Radial banding detected at dx={dx}: curr {curr} > prev {prev}"
-        );
+        assert!(curr <= prev + 1e-5, "Radial banding detected at dx={dx}: curr {curr} > prev {prev}");
         prev = curr;
     }
 
@@ -550,14 +435,8 @@ fn test_simd_accumulation_saturation_under_heavy_overlap() {
     }
 
     let center_val = cov.get(cx, cy);
-    assert!(
-        center_val <= ceil + 1e-5,
-        "Coverage must saturate at ceiling {ceil}, got {center_val}"
-    );
-    assert!(
-        (center_val - ceil).abs() < 1e-3,
-        "After 50 overlaps, center must be within 1e-3 of ceiling {ceil}, got {center_val}"
-    );
+    assert!(center_val <= ceil + 1e-5, "Coverage must saturate at ceiling {ceil}, got {center_val}");
+    assert!((center_val - ceil).abs() < 1e-3, "After 50 overlaps, center must be within 1e-3 of ceiling {ceil}, got {center_val}");
 }
 
 #[test]
@@ -584,10 +463,7 @@ fn test_simd_accumulation_matches_scalar_formula_exact() {
             let m_val = mask.data[m_row + (x - rect.x0) as usize];
             let expected = (m_val * alpha * ceil).min(ceil);
             let actual = cov.get(x, y);
-            assert!(
-                (actual - expected).abs() < 1e-5,
-                "SIMD accumulation mismatch at ({x}, {y}): expected {expected}, got {actual}"
-            );
+            assert!((actual - expected).abs() < 1e-5, "SIMD accumulation mismatch at ({x}, {y}): expected {expected}, got {actual}");
         }
     }
 }

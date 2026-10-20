@@ -371,11 +371,7 @@ mod tests {
     fn windows_ink_tablet_pressure_drives_stroke_width_and_opacity() {
         let mut st = ink::State::new().with_bounds(ink::DeviceBounds::LEVELS_8K).with_compression(false);
         let (light_dark, light_w, heavy_dark, heavy_w) = pressure_stroke(|p| {
-            let e = ink::RawPointerEvent {
-                message: ink::message::WM_POINTERUPDATE,
-                raw_pressure: (p * 8191.0) as u32,
-                ..Default::default()
-            };
+            let e = ink::RawPointerEvent { message: ink::message::WM_POINTERUPDATE, raw_pressure: (p * 8191.0) as u32, ..Default::default() };
             match st.handle(&e) {
                 Update::Set(s) => s,
                 Update::Keep => None,

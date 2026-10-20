@@ -38,8 +38,8 @@ pub use brush::{
     Scattering, SectionLocks, ShapeDynamics, Smoothing, Texture, TipShape, Transfer,
 };
 pub use curve::{
-    apply_tail_aggressiveness, catmull_rom_tangent, de_casteljau_subdivide, fit_cubic_bezier, fit_cubic_bezier_with_flatness,
-    gaussian_smooth_with_tail, ResponseCurve, SplineInterpolator,
+    ResponseCurve, SplineInterpolator, apply_tail_aggressiveness, catmull_rom_tangent, de_casteljau_subdivide, fit_cubic_bezier,
+    fit_cubic_bezier_with_flatness, gaussian_smooth_with_tail,
 };
 pub use mixer::MixerSettings;
 pub use render::{BrushContext, StrokeRenderer, UnionLive, grid_center, grid_square, render_stroke};

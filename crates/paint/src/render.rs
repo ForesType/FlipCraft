@@ -158,20 +158,8 @@ pub struct DabKey {
 }
 
 impl DabKey {
-    pub const fn new(
-        radius_quant: u16,
-        hardness_quant: u8,
-        softness_quant: u8,
-        aspect_quant: u8,
-        angle_quant: u16,
-    ) -> Self {
-        Self {
-            radius_quant,
-            hardness_quant,
-            softness_quant,
-            aspect_quant,
-            angle_quant,
-        }
+    pub const fn new(radius_quant: u16, hardness_quant: u8, softness_quant: u8, aspect_quant: u8, angle_quant: u16) -> Self {
+        Self { radius_quant, hardness_quant, softness_quant, aspect_quant, angle_quant }
     }
 
     pub fn from_params(radius: f32, hardness: f32, softness: f32, roundness: f32, angle: f32) -> Self {
@@ -186,13 +174,7 @@ impl DabKey {
             let norm = angle.rem_euclid(std::f32::consts::TAU) / std::f32::consts::TAU;
             (norm * 360.0).round() as u16 % 360
         };
-        Self {
-            radius_quant,
-            hardness_quant,
-            softness_quant,
-            aspect_quant,
-            angle_quant,
-        }
+        Self { radius_quant, hardness_quant, softness_quant, aspect_quant, angle_quant }
     }
 
     pub fn from_dab(d: &Dab, hardness: f32) -> Self {
@@ -293,10 +275,7 @@ pub fn rasterize_mask_for_key(key: &DabKey) -> DabMask {
         }
     }
 
-    DabMask {
-        size,
-        data: Arc::from(data),
-    }
+    DabMask { size, data: Arc::from(data) }
 }
 
 /// A thread-safe, bounded LRU cache for pre-rendered float coverage masks.
@@ -332,13 +311,7 @@ impl DabCache {
 
     pub fn new(capacity: usize) -> Self {
         let cap = capacity.max(1);
-        Self {
-            capacity: cap,
-            entries: Mutex::new(DabCacheInner {
-                map: HashMap::with_capacity(cap.min(256)),
-                clock: 0,
-            }),
-        }
+        Self { capacity: cap, entries: Mutex::new(DabCacheInner { map: HashMap::with_capacity(cap.min(256)), clock: 0 }) }
     }
 
     pub fn capacity(&self) -> usize {
@@ -410,20 +383,13 @@ impl DabCache {
         }
 
         if inner.map.len() >= self.capacity {
-            let oldest_key = inner
-                .map
-                .iter()
-                .min_by_key(|(_, entry)| entry.last_used)
-                .map(|(k, _)| k.clone());
+            let oldest_key = inner.map.iter().min_by_key(|(_, entry)| entry.last_used).map(|(k, _)| k.clone());
             if let Some(k) = oldest_key {
                 inner.map.remove(&k);
             }
         }
 
-        inner.map.insert(key.clone(), DabCacheEntry {
-            mask: mask.clone(),
-            last_used: clock,
-        });
+        inner.map.insert(key.clone(), DabCacheEntry { mask: mask.clone(), last_used: clock });
 
         mask
     }
@@ -817,15 +783,7 @@ impl CoverageMap {
     }
 
     /// Accumulate dab values over `rect` scaled by `alpha` with ceiling `ceil`.
-    pub fn accumulate_dab(
-        &mut self,
-        rect: Rect,
-        mask: &[f32],
-        alpha: f32,
-        ceil: f32,
-        color: Option<&[f32]>,
-        depth: Option<&[f32]>,
-    ) {
+    pub fn accumulate_dab(&mut self, rect: Rect, mask: &[f32], alpha: f32, ceil: f32, color: Option<&[f32]>, depth: Option<&[f32]>) {
         if rect.is_empty() || alpha <= 0.0 || ceil <= 0.0 {
             return;
         }
@@ -889,12 +847,7 @@ impl CoverageMap {
                     for y in tr.y0..tr.y1 {
                         let m_row = (y - rect.y0) as usize * w + (tr.x0 - rect.x0) as usize;
                         let t_row = ((y - ty * COV_TILE) * COV_TILE) as usize + (tr.x0 - tx * COV_TILE) as usize;
-                        accumulate_row_simd(
-                            &mut tile.cov[t_row..t_row + span_w],
-                            &mask[m_row..m_row + span_w],
-                            alpha,
-                            ceil,
-                        );
+                        accumulate_row_simd(&mut tile.cov[t_row..t_row + span_w], &mask[m_row..m_row + span_w], alpha, ceil);
                     }
                 } else {
                     for y in tr.y0..tr.y1 {
@@ -1629,12 +1582,7 @@ mod tests {
         // 500px diameter -> radius 250px
         let radius = 250.0;
         let hardness = 0.5;
-        let brush = BrushSettings {
-            size: 500.0,
-            hardness,
-            spacing: 1.0,
-            ..Default::default()
-        };
+        let brush = BrushSettings { size: 500.0, hardness, spacing: 1.0, ..Default::default() };
         // Position straddling multiple 64x64 tile boundaries
         let center = Point::new(320.5, 320.5);
         let dab = Dab::round(center, radius, 1.0);
@@ -1664,10 +1612,7 @@ mod tests {
                     let c_right = cov_map.get(seam_x + 1, y);
                     if c_left > 0.05 || c_right > 0.05 {
                         let diff = (c_left - c_right).abs();
-                        assert!(
-                            diff < 0.1,
-                            "Tile boundary seam artifact detected at ({seam_x}, {y}): left={c_left}, right={c_right}, diff={diff}"
-                        );
+                        assert!(diff < 0.1, "Tile boundary seam artifact detected at ({seam_x}, {y}): left={c_left}, right={c_right}, diff={diff}");
                     }
                 }
             }
@@ -1698,10 +1643,7 @@ mod tests {
             let expected_val = tip_falloff(r as f32, radius, hardness) * dab.alpha;
             let expected = expected_val.min(dab.opacity);
             let diff = (actual - expected).abs();
-            assert!(
-                diff < 0.02,
-                "Falloff mismatch at radius {r}: actual={actual}, expected={expected}, diff={diff}"
-            );
+            assert!(diff < 0.02, "Falloff mismatch at radius {r}: actual={actual}, expected={expected}, diff={diff}");
         }
     }
 }
