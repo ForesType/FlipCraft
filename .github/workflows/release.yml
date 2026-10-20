@@ -26,6 +26,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Checkout craft-fonts
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/craft-fonts
+          path: craft-fonts
+          ref: main
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -37,6 +44,8 @@ jobs:
 
       - name: Build release binaries
         run: cargo build --release -p flipcraft -p flipcraft-cli
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
 
       - name: Package Windows portable zip
         shell: pwsh
@@ -47,48 +56,67 @@ jobs:
           New-Item -ItemType Directory -Path $stage -Force
           Copy-Item "target/release/flipcraft.exe" -Destination "$stage/"
           Copy-Item "target/release/flipcraft-cli.exe" -Destination "$stage/"
+          Copy-Item "packaging/windows/portable.txt" -Destination "$stage/"
           Copy-Item "LICENSE-MIT" -Destination "$stage/"
           Copy-Item "LICENSE-APACHE" -Destination "$stage/"
           Copy-Item "NOTICE" -Destination "$stage/"
           Copy-Item "README.md" -Destination "$stage/"
+          if (Test-Path "craft-fonts/fonts") {
+            Get-ChildItem -Path "craft-fonts/fonts" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+              $lic = Join-Path $_.FullName 'OFL.txt'
+              if (Test-Path $lic) { Copy-Item $lic "$stage/OFL-$($_.Name).txt" }
+            }
+          }
           New-Item -ItemType Directory -Path "dist" -Force
           Compress-Archive -Path "$stage/*" -DestinationPath "dist/flipcraft-$ver-windows-x64.zip"
 
       - name: Package Windows MSI (WiX v5)
         shell: pwsh
-        continue-on-error: true
         run: |
           $ver = if ("${{ inputs.version }}") { "${{ inputs.version }}" } else { "${{ github.ref_name }}" }
           if (-not $ver) { $ver = "v0.15.0" }
           $cleanVer = $ver.TrimStart('v')
           dotnet tool install --global wix --version 5.0.2
+          $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
           wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
           
-          # Generate installer bitmaps
+          # Generate installer bitmaps (24bpp RGB required by WiX)
           Add-Type -AssemblyName System.Drawing
+          New-Item -ItemType Directory -Path "target" -Force | Out-Null
           $icon = [System.Drawing.Image]::FromFile((Resolve-Path "assets/app-icon/flipcraft-1024.png").Path)
-          $banner = "target/installer-banner.bmp"
-          $dialog = "target/installer-dialog.bmp"
-          $bmpB = New-Object System.Drawing.Bitmap 493, 58
+          $banner = (Join-Path (Get-Location).Path "target/installer-banner.bmp")
+          $dialog = (Join-Path (Get-Location).Path "target/installer-dialog.bmp")
+          
+          $bmpB = New-Object System.Drawing.Bitmap 493, 58, ([System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
           $gB = [System.Drawing.Graphics]::FromImage($bmpB)
+          $gB.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
           $gB.Clear([System.Drawing.Color]::White)
           $gB.DrawImage($icon, 493 - 46 - 8, 6, 46, 46)
           $bmpB.Save($banner, [System.Drawing.Imaging.ImageFormat]::Bmp)
+          $bmpB.Dispose()
+          $gB.Dispose()
           
-          $bmpD = New-Object System.Drawing.Bitmap 493, 312
+          $bmpD = New-Object System.Drawing.Bitmap 493, 312, ([System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
           $gD = [System.Drawing.Graphics]::FromImage($bmpD)
+          $gD.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
           $gD.Clear([System.Drawing.Color]::White)
           $gD.DrawImage($icon, 18, 64, 124, 124)
           $bmpD.Save($dialog, [System.Drawing.Imaging.ImageFormat]::Bmp)
+          $bmpD.Dispose()
+          $gD.Dispose()
+          $icon.Dispose()
           
           $binDir = (Resolve-Path "target/release").Path
           $iconPath = (Resolve-Path "assets/app-icon/flipcraft.ico").Path
-          wix build packaging/windows/photocraft.wxs -arch x64 `
+          $wxsPath = (Resolve-Path "packaging/windows/photocraft.wxs").Path
+          $wxlPath = (Resolve-Path "packaging/windows/photocraft.en-us.wxl").Path
+          
+          wix build "$wxsPath" -arch x64 `
             -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext `
-            -loc packaging/windows/photocraft.en-us.wxl `
+            -culture en-US -loc "$wxlPath" `
             -d Version=$cleanVer -d DisplayVersion=$ver `
-            -d BinDir=$binDir -d IconPath=$iconPath `
-            -d BannerBmp=(Resolve-Path $banner).Path -d DialogBmp=(Resolve-Path $dialog).Path `
+            -d BinDir="$binDir" -d IconPath="$iconPath" `
+            -d BannerBmp="$banner" -d DialogBmp="$dialog" `
             -o "dist/flipcraft-$ver-windows-x64.msi"
 
       - name: Upload Windows Artifacts
@@ -103,6 +131,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Checkout craft-fonts
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/craft-fonts
+          path: craft-fonts
+          ref: main
 
       - name: Install system dependencies
         run: |
@@ -120,6 +155,8 @@ jobs:
 
       - name: Build release binaries
         run: cargo build --release -p flipcraft -p flipcraft-cli
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
 
       - name: Package Linux tar.gz
         run: |
@@ -199,6 +236,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Checkout craft-fonts
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/craft-fonts
+          path: craft-fonts
+          ref: main
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -215,6 +259,8 @@ jobs:
           mkdir -p target/universal
           lipo -create -output target/universal/flipcraft target/aarch64-apple-darwin/release/flipcraft target/x86_64-apple-darwin/release/flipcraft
           lipo -create -output target/universal/flipcraft-cli target/aarch64-apple-darwin/release/flipcraft-cli target/x86_64-apple-darwin/release/flipcraft-cli
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
 
       - name: Assemble FlipCraft.app bundle and DMG
         run: |
@@ -282,8 +328,9 @@ jobs:
             - **Adaptive Distance Stepping**: Clean-room distance accumulator prevents dab starvation when stylus pressure drops.
             - **Native 16k & 8k Windows Ink Driver**: Direct `WM_POINTER` integration with hardware eraser flip detection and full pressure resolution.
             - **Zero Bloat**: Native `egui`/`eframe` on `wgpu` without Electron or webview shells.
+            - **True Portable Mode**: Fully self-contained portable package saves state in `FlipCraftData\` without touching `%APPDATA%`.
             
-            ### Verification
+            ### Downloads & Verification
             All binary packages are built natively on GitHub Actions runners without external proprietary signing dependencies.
           files: release-files/*
         env:
