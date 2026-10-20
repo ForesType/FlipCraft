@@ -67,7 +67,7 @@
 
 Ready-to-use installable and portable packages are available on our **[Releases Page](https://github.com/Paxon123/FlipCraft/releases)**:
 
-* 🪟 **Windows**: Portable `.zip` & `.msi` Installer (x64)
+* 🪟 **Windows**: Portable `.zip` & `.msi` Installer (x64 & ARM64)
 * 🐧 **Linux**: Standalone `.AppImage`, `.deb`, & `.tar.gz`
 * 🍎 **macOS**: Universal `.dmg` Disk Image
 

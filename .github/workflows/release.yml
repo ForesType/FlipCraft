@@ -20,8 +20,16 @@ concurrency:
 
 jobs:
   build-windows:
-    name: Build Windows (x64)
+    name: Build Windows (${{ matrix.arch }})
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            target: x86_64-pc-windows-msvc
+          - arch: arm64
+            target: aarch64-pc-windows-msvc
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,25 +45,30 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.95.0
-          targets: x86_64-pc-windows-msvc
+          targets: ${{ matrix.target }}
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
       - name: Build release binaries
-        run: cargo build --release -p flipcraft -p flipcraft-cli
+        run: cargo build --release -p flipcraft -p flipcraft-cli --target ${{ matrix.target }}
         env:
           CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+          CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: "-C target-feature=+crt-static"
+          CARGO_TARGET_AARCH64_PC_WINDOWS_MSVC_RUSTFLAGS: "-C target-feature=+crt-static"
 
       - name: Package Windows portable zip
         shell: pwsh
         run: |
           $ver = if ("${{ inputs.version }}") { "${{ inputs.version }}" } else { "${{ github.ref_name }}" }
           if (-not $ver) { $ver = "v0.15.0" }
-          $stage = "flipcraft-$ver-windows-x64"
+          $arch = "${{ matrix.arch }}"
+          $stage = "flipcraft-$ver-windows-$arch"
           New-Item -ItemType Directory -Path $stage -Force
-          Copy-Item "target/release/flipcraft.exe" -Destination "$stage/"
-          Copy-Item "target/release/flipcraft-cli.exe" -Destination "$stage/"
+          Copy-Item "target/${{ matrix.target }}/release/flipcraft.exe" -Destination "$stage/"
+          Copy-Item "target/${{ matrix.target }}/release/flipcraft-cli.exe" -Destination "$stage/"
           Copy-Item "packaging/windows/portable.txt" -Destination "$stage/"
           Copy-Item "LICENSE-MIT" -Destination "$stage/"
           Copy-Item "LICENSE-APACHE" -Destination "$stage/"
@@ -68,7 +81,7 @@ jobs:
             }
           }
           New-Item -ItemType Directory -Path "dist" -Force
-          Compress-Archive -Path "$stage/*" -DestinationPath "dist/flipcraft-$ver-windows-x64.zip"
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/flipcraft-$ver-windows-$arch.zip"
 
       - name: Package Windows MSI (WiX v5)
         shell: pwsh
@@ -76,6 +89,7 @@ jobs:
           $ver = if ("${{ inputs.version }}") { "${{ inputs.version }}" } else { "${{ github.ref_name }}" }
           if (-not $ver) { $ver = "v0.15.0" }
           $cleanVer = $ver.TrimStart('v')
+          $arch = "${{ matrix.arch }}"
           dotnet tool install --global wix --version 5.0.2
           $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
           wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
@@ -84,8 +98,8 @@ jobs:
           Add-Type -AssemblyName System.Drawing
           New-Item -ItemType Directory -Path "target" -Force | Out-Null
           $icon = [System.Drawing.Image]::FromFile((Resolve-Path "assets/app-icon/flipcraft-1024.png").Path)
-          $banner = (Join-Path (Get-Location).Path "target/installer-banner.bmp")
-          $dialog = (Join-Path (Get-Location).Path "target/installer-dialog.bmp")
+          $banner = (Join-Path (Get-Location).Path "target/installer-banner-$arch.bmp")
+          $dialog = (Join-Path (Get-Location).Path "target/installer-dialog-$arch.bmp")
           
           $bmpB = New-Object System.Drawing.Bitmap 493, 58, ([System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
           $gB = [System.Drawing.Graphics]::FromImage($bmpB)
@@ -106,23 +120,26 @@ jobs:
           $gD.Dispose()
           $icon.Dispose()
           
-          $binDir = (Resolve-Path "target/release").Path
+          $binDir = (Resolve-Path "target/${{ matrix.target }}/release").Path
           $iconPath = (Resolve-Path "assets/app-icon/flipcraft.ico").Path
           $wxsPath = (Resolve-Path "packaging/windows/photocraft.wxs").Path
           $wxlPath = (Resolve-Path "packaging/windows/photocraft.en-us.wxl").Path
           
-          wix build "$wxsPath" -arch x64 `
+          wix build "$wxsPath" -arch "$arch" `
             -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext `
             -culture en-US -loc "$wxlPath" `
             -d Version=$cleanVer -d DisplayVersion=$ver `
             -d BinDir="$binDir" -d IconPath="$iconPath" `
             -d BannerBmp="$banner" -d DialogBmp="$dialog" `
-            -o "dist/flipcraft-$ver-windows-x64.msi"
+            -o "dist/flipcraft-$ver-windows-$arch.msi"
+          
+          # Remove WiX debug symbols from dist so they are not uploaded
+          Remove-Item -Force -ErrorAction SilentlyContinue "dist/*.wixpdb"
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-windows
+          name: release-windows-${{ matrix.arch }}
           path: dist/*
 
   build-linux:
@@ -329,6 +346,7 @@ jobs:
             - **Native 16k & 8k Windows Ink Driver**: Direct `WM_POINTER` integration with hardware eraser flip detection and full pressure resolution.
             - **Zero Bloat**: Native `egui`/`eframe` on `wgpu` without Electron or webview shells.
             - **True Portable Mode**: Fully self-contained portable package saves state in `FlipCraftData\` without touching `%APPDATA%`.
+            - **Full Architecture Support**: Native x64 and ARM64 packages for Windows, macOS Universal (Apple Silicon & Intel), and Linux x86_64.
             
             ### Downloads & Verification
             All binary packages are built natively on GitHub Actions runners without external proprietary signing dependencies.

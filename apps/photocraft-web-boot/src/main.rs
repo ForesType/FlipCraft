@@ -350,7 +350,7 @@ mod tests {
         let trunk = |html: &str| html.lines().filter(|l| !l.contains("data-trunk")).collect::<Vec<_>>().join("\n");
         let (boot, app) = (include_str!("../index.html"), include_str!("../../photocraft-web/index.html"));
         assert_eq!(trunk(boot), trunk(app));
-        assert!(boot.contains(r#"data-bin="photocraft-web-boot""#) && boot.contains(r#"data-cargo-profile="wasm-release""#), "{boot}");
+        assert!(boot.contains(r#"data-bin="flipcraft-web-boot""#) && boot.contains(r#"data-cargo-profile="wasm-release""#), "{boot}");
         assert!(boot.contains(r#"id="photocraft_loading""#), "the element the failure message replaces");
     }
 }
