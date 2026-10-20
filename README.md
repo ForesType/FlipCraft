@@ -4,7 +4,7 @@
 
 # FlipCraft
 
-**PhotoCraft, refined for digital artists.**
+**PhotoCraft but refined for digital artists.**
 
 [![Version](https://img.shields.io/badge/version-0.15.0-blue.svg)](https://github.com/Paxon123/FlipCraft/releases)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
