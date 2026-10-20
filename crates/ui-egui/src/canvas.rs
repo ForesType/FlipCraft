@@ -3141,10 +3141,11 @@ fn finalize_hover_flight(app: &mut PhotocraftApp, d: &mut Drag) {
 fn handle_stroke_up(app: &mut PhotocraftApp, x: f64, y: f64, mods: egui::Modifiers, events: &[egui::Event], xf: &ViewXform, ctx: &egui::Context) {
     let now_ms = app.stylus.clock_ms;
     let brush_radius = (app.session.tools.brush.size as f64 * 0.5).max(1.0);
-    let qualifies = app
-        .drag
-        .as_ref()
-        .is_some_and(|d| freehand_tool(d.tool) && (d.is_stylus || app.stylus.sample().is_some()) && d.points.len() > 1 && d.hover_flight.is_none());
+    let qualifies = !mods.shift
+        && app
+            .drag
+            .as_ref()
+            .is_some_and(|d| freehand_tool(d.tool) && (d.is_stylus || app.stylus.sample().is_some()) && d.points.len() > 1 && d.hover_flight.is_none());
 
     let flight_params = if qualifies {
         let d = app.drag.as_mut().unwrap();
@@ -5907,7 +5908,7 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
                 }
                 return;
             }
-            let is_stylus_stroke = (d.is_stylus || app.stylus.sample().is_some() || d.points.iter().any(|p| p[2] != 1.0)) && d.points.len() > 1;
+            let is_stylus_stroke = !mods.shift && (d.is_stylus || app.stylus.sample().is_some() || d.points.iter().any(|p| p[2] != 1.0)) && d.points.len() > 1;
             if is_stylus_stroke {
                 let brush_radius = (app.session.tools.brush.size as f64 * 0.5).max(1.0);
                 if let Some(flick_pts) = app.stylus.flick_continuation(&mut d.points, brush_radius, app.hover_doc) {
