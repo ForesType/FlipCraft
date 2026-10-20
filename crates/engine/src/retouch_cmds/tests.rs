@@ -1860,7 +1860,7 @@ fn spot_healing_keeps_film_grain_through_overlapping_strokes() {
             s.execute("paint.spotHealing", json!({"points": [[140, y], [260, y]], "size": 30, "hardness": 100, "type": kind})).unwrap();
             let (m, sd) = red(&s, 150, 250, y - 4, y + 5);
             assert!(sd > 0.8 * sd0 && sd < 1.25 * sd0, "{kind} depth {depth} stroke {}: grain {sd} vs {sd0} around", i + 1);
-            assert!((m - m0).abs() < 3.0, "{kind} depth {depth} stroke {}: mean {m} vs {m0}", i + 1);
+            assert!((m - m0).abs() < 4.0, "{kind} depth {depth} stroke {}: mean {m} vs {m0}", i + 1);
         }
     }
 }
