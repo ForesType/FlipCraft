@@ -234,7 +234,7 @@ jobs:
           Section: graphics
           Priority: optional
           Architecture: amd64
-          Maintainer: Paxon123 <99889435+Paxon123@users.noreply.github.com>
+          Maintainer: ForesType <99889435+ForesType@users.noreply.github.com>
           Description: FlipCraft artist-centric image editor
            A high-performance, artist-centric digital painting & image editor written in pure Rust.
           EOF

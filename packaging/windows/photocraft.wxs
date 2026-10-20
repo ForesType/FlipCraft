@@ -20,9 +20,9 @@
 
     <Icon Id="PhotocraftIcon.exe" SourceFile="$(var.IconPath)" />
     <Property Id="ARPPRODUCTICON" Value="PhotocraftIcon.exe" />
-    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Paxon123/FlipCraft" />
-    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/Paxon123/FlipCraft" />
-    <Property Id="ARPHELPLINK" Value="https://github.com/Paxon123/FlipCraft/issues" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/ForesType/FlipCraft" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/ForesType/FlipCraft" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/ForesType/FlipCraft/issues" />
 
     <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLFOLDER" Name="FlipCraft" />

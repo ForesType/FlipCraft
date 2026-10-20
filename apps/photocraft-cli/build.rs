@@ -20,7 +20,7 @@ fn main() -> std::io::Result<()> {
         .set("ProductName", "FlipCraft")
         .set("FileDescription", "FlipCraft command-line interface")
         .set("CompanyName", "FlipCraft Contributors")
-        .set("LegalCopyright", "Copyright (c) 2026 Paxon123 and the FlipCraft contributors. MIT OR Apache-2.0.")
+        .set("LegalCopyright", "Copyright (c) 2026 ForesType and the FlipCraft contributors. MIT OR Apache-2.0.")
         .set("OriginalFilename", "flipcraft-cli.exe")
         .set("InternalName", "flipcraft-cli");
     if let Err(err) = res.compile() {

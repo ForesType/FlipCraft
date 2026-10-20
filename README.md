@@ -6,7 +6,7 @@
 
 **PhotoCraft but refined for digital artists.**
 
-[![Version](https://img.shields.io/badge/version-0.15.0-blue.svg)](https://github.com/Paxon123/FlipCraft/releases)
+[![Version](https://img.shields.io/badge/version-0.15.0-blue.svg)](https://github.com/ForesType/FlipCraft/releases)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 [![Pure Rust](https://img.shields.io/badge/rust-100%25%20safe%20%7C%20wgpu-orange.svg)](https://www.rust-lang.org/)
 [![No Electron](https://img.shields.io/badge/bloat-zero%20(No%20Electron%2FTauri)-success.svg)](#features)
@@ -65,7 +65,7 @@
 
 ## 📥 Downloads
 
-Ready-to-use installable and portable packages are available on our **[Releases Page](https://github.com/Paxon123/FlipCraft/releases)**:
+Ready-to-use installable and portable packages are available on our **[Releases Page](https://github.com/ForesType/FlipCraft/releases)**:
 
 * 🪟 **Windows**: Portable `.zip` & `.msi` Installer (x64 & ARM64)
 * 🐧 **Linux**: Standalone `.AppImage`, `.deb`, & `.tar.gz`

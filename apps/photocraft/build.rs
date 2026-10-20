@@ -16,7 +16,7 @@ fn main() {
         .set("ProductName", "FlipCraft")
         .set("FileDescription", "FlipCraft image editor")
         .set("CompanyName", "FlipCraft Contributors")
-        .set("LegalCopyright", "Copyright (c) 2026 Paxon123 and the FlipCraft contributors. MIT OR Apache-2.0.")
+        .set("LegalCopyright", "Copyright (c) 2026 ForesType and the FlipCraft contributors. MIT OR Apache-2.0.")
         .set("OriginalFilename", "flipcraft.exe")
         .set("InternalName", "flipcraft");
     if let Err(e) = res.compile() {
