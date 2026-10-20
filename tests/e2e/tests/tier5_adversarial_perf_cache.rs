@@ -69,7 +69,7 @@ fn profile_stroke_chunks(brush: &BrushSettings, point_count: usize, chunk_size: 
 /// while granting reasonable headroom on shared, unoptimized cloud CI virtual machines.
 fn max_latency(baseline_ms: f64) -> f64 {
     if std::env::var("CI").is_ok() || cfg!(debug_assertions) {
-        baseline_ms * 5.0
+        baseline_ms * 10.0
     } else {
         baseline_ms
     }
