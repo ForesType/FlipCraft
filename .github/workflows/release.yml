@@ -56,18 +56,39 @@ jobs:
 
       - name: Package Windows MSI (WiX v5)
         shell: pwsh
+        continue-on-error: true
         run: |
           $ver = if ("${{ inputs.version }}") { "${{ inputs.version }}" } else { "${{ github.ref_name }}" }
           if (-not $ver) { $ver = "v0.15.0" }
           $cleanVer = $ver.TrimStart('v')
           dotnet tool install --global wix --version 5.0.2
           wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
+          
+          # Generate installer bitmaps
+          Add-Type -AssemblyName System.Drawing
+          $icon = [System.Drawing.Image]::FromFile((Resolve-Path "assets/app-icon/flipcraft-1024.png").Path)
+          $banner = "target/installer-banner.bmp"
+          $dialog = "target/installer-dialog.bmp"
+          $bmpB = New-Object System.Drawing.Bitmap 493, 58
+          $gB = [System.Drawing.Graphics]::FromImage($bmpB)
+          $gB.Clear([System.Drawing.Color]::White)
+          $gB.DrawImage($icon, 493 - 46 - 8, 6, 46, 46)
+          $bmpB.Save($banner, [System.Drawing.Imaging.ImageFormat]::Bmp)
+          
+          $bmpD = New-Object System.Drawing.Bitmap 493, 312
+          $gD = [System.Drawing.Graphics]::FromImage($bmpD)
+          $gD.Clear([System.Drawing.Color]::White)
+          $gD.DrawImage($icon, 18, 64, 124, 124)
+          $bmpD.Save($dialog, [System.Drawing.Imaging.ImageFormat]::Bmp)
+          
           $binDir = (Resolve-Path "target/release").Path
           $iconPath = (Resolve-Path "assets/app-icon/flipcraft.ico").Path
           wix build packaging/windows/photocraft.wxs -arch x64 `
             -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext `
+            -loc packaging/windows/photocraft.en-us.wxl `
             -d Version=$cleanVer -d DisplayVersion=$ver `
             -d BinDir=$binDir -d IconPath=$iconPath `
+            -d BannerBmp=(Resolve-Path $banner).Path -d DialogBmp=(Resolve-Path $dialog).Path `
             -o "dist/flipcraft-$ver-windows-x64.msi"
 
       - name: Upload Windows Artifacts
@@ -228,6 +249,7 @@ jobs:
   publish-release:
     name: Publish GitHub Release
     needs: [build-windows, build-linux, build-macos]
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
